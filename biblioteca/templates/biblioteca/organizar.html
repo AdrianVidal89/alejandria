@@ -1,0 +1,128 @@
+{% extends "biblioteca/base.html" %}
+{% block titulo %}Organizar · Alejandria{% endblock %}
+{% block nav_organizar %}activo{% endblock %}
+{% block contenido %}
+<main class="pagina">
+  <h1>Organizar</h1>
+  <p class="nada">Etiquetas, corresponsales, tipos y campos personalizados. Borrar cualquiera de
+     estos elementos <strong>no borra documentos</strong>: solo deja de estar asignado.</p>
+
+  <section class="bloque" id="etiquetas">
+    <h2>Etiquetas</h2>
+    <table class="tabla-simple">
+      <tbody>
+      {% for e in arbol %}
+        <tr>
+          <td style="padding-left:{{ e.nivel }}0px"><i class="punto" style="background:{{ e.color }}"></i> {{ e.nombre }}
+            {% if e.inbox %}<span class="etq">buzón</span>{% endif %}</td>
+          <td class="derecha">{{ e.n }} doc.</td>
+          <td class="derecha">
+            <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" onsubmit="return confirm('¿Borrar la etiqueta {{ e.nombre|escapejs }}?')">
+              {% csrf_token %}<input type="hidden" name="que" value="etiqueta">
+              <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ e.pk }}">
+              <button class="btn peligro mini">Borrar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
+      {% csrf_token %}<input type="hidden" name="que" value="etiqueta">
+      <input type="text" name="nombre" placeholder="Nombre de la etiqueta" required>
+      <select name="padre"><option value="">— sin padre —</option>
+        {% for e in arbol %}<option value="{{ e.pk }}">{{ e.ruta_nombre }}</option>{% endfor %}
+      </select>
+      <input type="color" name="color" value="#8a8f98">
+      <label class="interruptor"><input type="checkbox" name="inbox" value="1"> Buzón</label>
+      <button class="btn primario">Añadir</button>
+    </form>
+  </section>
+
+  <section class="bloque">
+    <h2>Corresponsales</h2>
+    <div class="nube">
+      {% for c in corresponsales %}
+        <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="pildora">
+          {% csrf_token %}<input type="hidden" name="que" value="corresponsal">
+          <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ c.pk }}">
+          <span>{{ c.nombre }} <em>{{ c.n }}</em></span><button title="Borrar">×</button>
+        </form>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
+      {% csrf_token %}<input type="hidden" name="que" value="corresponsal">
+      <input type="text" name="nombre" placeholder="Nuevo corresponsal" required>
+      <button class="btn primario">Añadir</button>
+    </form>
+  </section>
+
+  <section class="bloque">
+    <h2>Tipos de documento</h2>
+    <div class="nube">
+      {% for t in tipos %}
+        <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="pildora">
+          {% csrf_token %}<input type="hidden" name="que" value="tipo">
+          <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ t.pk }}">
+          <span>{{ t.nombre }} <em>{{ t.n }}</em></span><button title="Borrar">×</button>
+        </form>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
+      {% csrf_token %}<input type="hidden" name="que" value="tipo">
+      <input type="text" name="nombre" placeholder="Nuevo tipo" required>
+      <button class="btn primario">Añadir</button>
+    </form>
+  </section>
+
+  <section class="bloque">
+    <h2>Campos personalizados</h2>
+    <table class="tabla-simple">
+      <tbody>
+      {% for c in campos %}
+        <tr>
+          <td>{{ c.nombre }}</td><td>{{ c.get_tipo_display }}</td>
+          <td>{% for o in c.opciones %}<span class="etq">{{ o }}</span>{% endfor %}</td>
+          <td class="derecha">
+            <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" onsubmit="return confirm('¿Borrar el campo y todos sus valores?')">
+              {% csrf_token %}<input type="hidden" name="que" value="campo">
+              <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ c.pk }}">
+              <button class="btn peligro mini">Borrar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
+      {% csrf_token %}<input type="hidden" name="que" value="campo">
+      <input type="text" name="nombre" placeholder="Nombre del campo" required>
+      <select name="tipo">{% for clave, etiqueta in tipos_campo %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}</select>
+      <input type="text" name="opciones" placeholder="Opciones separadas por comas (solo listas)">
+      <button class="btn primario">Añadir</button>
+    </form>
+  </section>
+
+  <section class="bloque">
+    <h2>Búsquedas guardadas</h2>
+    <p class="nada">Fija una búsqueda en la barra lateral. Copia lo que va después de la «?» en la
+       barra de direcciones cuando tengas los filtros puestos como quieres.</p>
+    <div class="nube">
+      {% for g in guardadas %}
+        <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="pildora">
+          {% csrf_token %}<input type="hidden" name="que" value="guardada">
+          <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ g.pk }}">
+          <span>{{ g.icono }} {{ g.nombre }}</span><button title="Borrar">×</button>
+        </form>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
+      {% csrf_token %}<input type="hidden" name="que" value="guardada">
+      <input type="text" name="icono" value="🔎" size="2">
+      <input type="text" name="nombre" placeholder="Nombre" required>
+      <input type="text" name="consulta" placeholder="vista=&amp;etiqueta=3&amp;orden=fecha" required>
+      <button class="btn primario">Añadir</button>
+    </form>
+  </section>
+</main>
+{% endblock %}

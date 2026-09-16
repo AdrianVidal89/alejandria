@@ -1,0 +1,41 @@
+{% load static %}<!doctype html>
+<html lang="es" data-tema="{{ request.COOKIES.tema|default:'auto' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Alejandria{% endblock %}</title>
+  <link rel="icon" href="{% static 'biblioteca/icono.svg' %}">
+  <link rel="stylesheet" href="{% static 'biblioteca/app.css' %}">
+</head>
+<body class="{% block cuerpo %}{% endblock %}">
+<header class="barra">
+  <a class="marca" href="{% url 'biblioteca:biblioteca' %}"><span>𝕬</span> Alejandria</a>
+
+  <form class="buscador" method="get" action="{% url 'biblioteca:biblioteca' %}">
+    <input type="search" name="q" id="q" placeholder="Buscar por título, etiqueta, corresponsal, carpeta…"
+           value="{{ filtros.q|default:'' }}" autocomplete="off" spellcheck="false">
+    {% if filtros.vista %}<input type="hidden" name="vista" value="{{ filtros.vista }}">{% endif %}
+    <kbd>/</kbd>
+  </form>
+
+  <nav class="acciones-barra">
+    <button type="button" class="btn" id="boton-subir" title="Añadir documentos">＋ Añadir</button>
+    <a class="btn {% block nav_organizar %}{% endblock %}" href="{% url 'biblioteca:organizar' %}">Organizar</a>
+    <a class="btn {% block nav_estado %}{% endblock %}" href="{% url 'biblioteca:estado' %}">Estado</a>
+    <button type="button" class="btn icono" id="boton-tema" title="Tema claro / oscuro">◐</button>
+  </nav>
+</header>
+
+{% block contenido %}{% endblock %}
+
+<form id="formulario-subida" action="{% url 'biblioteca:subir' %}" method="post"
+      enctype="multipart/form-data" hidden>
+  {% csrf_token %}
+  <input type="file" name="ficheros" id="ficheros" multiple>
+</form>
+<div id="zona-soltar" hidden><div>Suelta aquí los documentos</div></div>
+
+<script src="{% static 'biblioteca/app.js' %}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

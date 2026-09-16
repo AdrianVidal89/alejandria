@@ -1,0 +1,109 @@
+{% load biblioteca_extras %}
+<div class="cabecera-lista">
+  <div class="migas">
+    {% if filtros.q %}<span class="chip">“{{ filtros.q }}” <a href="?{% consulta q=None %}">×</a></span>{% endif %}
+    <strong>{{ pagina.paginator.count }}</strong> documento{{ pagina.paginator.count|pluralize:"s" }}
+  </div>
+  <div class="controles">
+    <label class="selector">
+      <select onchange="location.search='{% consulta orden='ORDEN' %}'.replace('ORDEN', this.value)">
+        {% for clave, datos in ordenes.items %}
+          <option value="{{ clave }}" {% if filtros.orden == clave %}selected{% endif %}>{{ datos.1 }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <a class="btn icono {% if presentacion == 'lista' %}activo{% endif %}" href="?{% consulta modo='lista' %}" title="Lista">☰</a>
+    <a class="btn icono {% if presentacion == 'rejilla' %}activo{% endif %}" href="?{% consulta modo='rejilla' %}" title="Miniaturas">▦</a>
+  </div>
+</div>
+
+<div class="acciones-seleccion" id="acciones-seleccion" hidden>
+  <form method="post" action="{% url 'biblioteca:acciones' %}" id="form-acciones">
+    {% csrf_token %}
+    <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+    <span id="contador-seleccion">0 seleccionados</span>
+    <select name="etiqueta">
+      <option value="">— etiqueta —</option>
+      {% for e in arbol %}<option value="{{ e.pk }}">{{ e.ruta_nombre }}</option>{% endfor %}
+    </select>
+    <button class="btn" name="accion" value="etiquetar">Etiquetar</button>
+    <button class="btn" name="accion" value="desetiquetar">Quitar</button>
+    <select name="corresponsal">
+      <option value="">— corresponsal —</option>
+      {% for c in corresponsales %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
+    </select>
+    <button class="btn" name="accion" value="corresponsal">Asignar</button>
+    {% if filtros.vista == 'papelera' %}
+      <button class="btn" name="accion" value="restaurar">Restaurar</button>
+      <button class="btn peligro" name="accion" value="borrar_definitivo"
+              onclick="return confirm('Quita la ficha de Alejandria. El fichero del disco NO se toca. ¿Seguir?')">Quitar ficha</button>
+    {% else %}
+      <button class="btn" name="accion" value="papelera">A la papelera</button>
+    {% endif %}
+  </form>
+</div>
+
+{% if presentacion == 'rejilla' %}
+<div class="rejilla" id="documentos">
+  {% for d in pagina %}
+  <article class="tarjeta {% if actual and d.pk == actual.pk %}activa{% endif %}" data-id="{{ d.pk }}" tabindex="0">
+    <label class="marca-seleccion"><input type="checkbox" class="chk" value="{{ d.pk }}"></label>
+    <div class="lamina">
+      <img loading="lazy" src="{% url 'biblioteca:miniatura' d.pk %}" alt="">
+      {% if not d.existe %}<span class="aviso-fichero">⚠</span>{% endif %}
+    </div>
+    <h4>{{ d.titulo }}</h4>
+    <p class="meta">{{ d.corresponsal|default:"—" }} · {{ d.fecha|date:"d/m/Y"|default:"sin fecha" }}</p>
+    <p class="etiquetas">{% for e in d.etiquetas.all %}<i class="punto" style="background:{{ e.color }}"></i>{% endfor %}</p>
+  </article>
+  {% empty %}
+  <p class="nada grande">Nada por aquí. Prueba a cambiar los filtros o a escanear la biblioteca.</p>
+  {% endfor %}
+</div>
+{% else %}
+<table class="tabla" id="documentos">
+  <thead>
+    <tr>
+      <th class="col-chk"><input type="checkbox" id="chk-todos"></th>
+      <th class="col-icono"></th>
+      <th>Título</th>
+      <th class="col-corr">Corresponsal</th>
+      <th class="col-tipo">Tipo</th>
+      <th class="col-etq">Etiquetas</th>
+      <th class="col-fecha">Fecha</th>
+      <th class="col-tam">Tamaño</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for d in pagina %}
+    <tr class="{% if actual and d.pk == actual.pk %}activa{% endif %} {% if not d.existe %}rota{% endif %}"
+        data-id="{{ d.pk }}" tabindex="0">
+      <td class="col-chk"><input type="checkbox" class="chk" value="{{ d.pk }}"></td>
+      <td class="col-icono">{{ d.icono }}</td>
+      <td class="col-titulo">
+        <span class="titulo">{{ d.titulo }}</span>
+        {% if d.favorito %}<span class="estrella">★</span>{% endif %}
+        <span class="ruta">{{ d.carpeta }}</span>
+      </td>
+      <td class="col-corr">{{ d.corresponsal|default:"" }}</td>
+      <td class="col-tipo">{{ d.tipo|default:"" }}</td>
+      <td class="col-etq">
+        {% for e in d.etiquetas.all %}<span class="etq" style="--c:{{ e.color }}">{{ e.nombre }}</span>{% endfor %}
+      </td>
+      <td class="col-fecha">{{ d.fecha|date:"d/m/Y"|default:"—" }}</td>
+      <td class="col-tam">{{ d.tamano_legible }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="8"><p class="nada grande">Nada por aquí. Cambia los filtros o escanea la biblioteca desde <a href="{% url 'biblioteca:estado' %}">Estado</a>.</p></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if pagina.paginator.num_pages > 1 %}
+<nav class="paginacion">
+  {% if pagina.has_previous %}<a class="btn" href="?{% consulta %}&pagina={{ pagina.previous_page_number }}">‹ Anterior</a>{% endif %}
+  <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
+  {% if pagina.has_next %}<a class="btn" href="?{% consulta %}&pagina={{ pagina.next_page_number }}">Siguiente ›</a>{% endif %}
+</nav>
+{% endif %}

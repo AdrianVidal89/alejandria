@@ -1,0 +1,4 @@
+# Tres dependencias y ninguna más. Nada de Celery, Redis, Postgres ni OCR.
+Django>=5.2,<6.0
+gunicorn>=23.0
+whitenoise>=6.7

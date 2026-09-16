@@ -1,0 +1,14 @@
+{% extends "biblioteca/base.html" %}
+{% block titulo %}Acceder · Alejandria{% endblock %}
+{% block contenido %}
+<main class="pagina estrecha">
+  <h1>Alejandria</h1>
+  <form method="post" class="ficha">
+    {% csrf_token %}
+    {% if error %}<p class="alerta">{{ error }}</p>{% endif %}
+    <label>Usuario<input type="text" name="usuario" autofocus></label>
+    <label>Contraseña<input type="password" name="clave"></label>
+    <button class="btn primario">Entrar</button>
+  </form>
+</main>
+{% endblock %}

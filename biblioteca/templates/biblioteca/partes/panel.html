@@ -1,0 +1,124 @@
+{% load biblioteca_extras %}
+<div class="detalle-cabecera">
+  <div>
+    <h2 id="titulo-detalle">{{ doc.titulo }}</h2>
+    <p class="ruta-detalle" title="{{ doc.ruta }}">{{ doc.ruta }}</p>
+  </div>
+  <div class="detalle-botones">
+    <a class="btn" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">Abrir</a>
+    <a class="btn" href="{% url 'biblioteca:descargar' doc.pk %}">Descargar</a>
+  </div>
+</div>
+
+{% if not doc.existe %}
+  <p class="alerta">⚠ El fichero no está en la carpeta. Se movió o se borró desde fuera de Alejandria.</p>
+{% endif %}
+
+<div class="previsualizacion">
+  {% if doc.es_pdf and doc.existe %}
+    <iframe src="{% url 'biblioteca:fichero' doc.pk %}#view=FitH&toolbar=0" title="Vista previa" loading="lazy"></iframe>
+  {% elif doc.es_imagen and doc.existe %}
+    <img src="{% url 'biblioteca:fichero' doc.pk %}" alt="{{ doc.titulo }}">
+  {% elif doc.existe %}
+    <div class="sin-vista">
+      <img src="{% url 'biblioteca:miniatura' doc.pk %}" alt="" class="miniatura-grande">
+      <p>{{ doc.icono }} {{ doc.extension|upper }} · {{ doc.tamano_legible }}</p>
+      <p class="nada">Sin vista previa para este formato. Ábrelo con «Abrir».</p>
+    </div>
+  {% endif %}
+</div>
+
+<form class="ficha" method="post" action="{% url 'biblioteca:guardar' doc.pk %}" id="ficha-documento">
+  {% csrf_token %}
+  <label>Título
+    <input type="text" name="titulo" value="{{ doc.titulo }}">
+  </label>
+
+  <div class="dos">
+    <label>Fecha del documento
+      <input type="date" name="fecha" value="{{ doc.fecha|date:'Y-m-d' }}">
+    </label>
+    <label class="interruptor">
+      <input type="checkbox" name="favorito" value="1" {% if doc.favorito %}checked{% endif %}> Favorito ★
+    </label>
+  </div>
+
+  <label>Corresponsal
+    <select name="corresponsal">
+      <option value="">— ninguno —</option>
+      {% for c in corresponsales_todos %}
+        <option value="{{ c.pk }}" {% if doc.corresponsal_id == c.pk %}selected{% endif %}>{{ c.nombre }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="corresponsal_nuevo" placeholder="…o escribe uno nuevo" class="anadir">
+  </label>
+
+  <label>Tipo de documento
+    <select name="tipo">
+      <option value="">— ninguno —</option>
+      {% for t in tipos_todos %}
+        <option value="{{ t.pk }}" {% if doc.tipo_id == t.pk %}selected{% endif %}>{{ t.nombre }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="tipo_nuevo" placeholder="…o escribe uno nuevo" class="anadir">
+  </label>
+
+  <fieldset class="etiquetas-ficha">
+    <legend>Etiquetas</legend>
+    <div class="nube">
+      {% for e in etiquetas_todas %}
+        <label class="etq-check">
+          <input type="checkbox" name="etiquetas" value="{{ e.pk }}"
+                 {% if e in doc.etiquetas.all %}checked{% endif %}>
+          <span style="--c:{{ e.color }}">{{ e.nombre }}</span>
+        </label>
+      {% endfor %}
+    </div>
+    <input type="text" name="etiquetas_nuevas" placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
+  </fieldset>
+
+  {% if campos_documento %}
+  <fieldset>
+    <legend>Campos personalizados</legend>
+    {% for fila in campos_documento %}
+      <label class="campo">{{ fila.campo.nombre }}
+        {% if fila.campo.tipo == 'booleano' %}
+          <select name="campo_{{ fila.campo.pk }}">
+            <option value="">—</option>
+            <option value="1" {% if fila.valor.valor == '1' %}selected{% endif %}>Sí</option>
+            <option value="0" {% if fila.valor.valor == '0' %}selected{% endif %}>No</option>
+          </select>
+        {% elif fila.campo.tipo == 'seleccion' %}
+          <select name="campo_{{ fila.campo.pk }}">
+            <option value="">—</option>
+            {% for o in fila.campo.opciones %}
+              <option value="{{ o }}" {% if fila.valor.valor == o %}selected{% endif %}>{{ o }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="{% if fila.campo.tipo == 'fecha' %}date{% elif fila.campo.tipo == 'numero' or fila.campo.tipo == 'moneda' %}number{% elif fila.campo.tipo == 'url' %}url{% else %}text{% endif %}"
+                 {% if fila.campo.tipo == 'moneda' %}step="0.01"{% endif %}
+                 name="campo_{{ fila.campo.pk }}" value="{{ fila.valor.valor|default:'' }}">
+        {% endif %}
+      </label>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+
+  <label>Notas
+    <textarea name="notas" rows="4" placeholder="Anotaciones, contexto, dónde está el original en papel…">{{ doc.notas }}</textarea>
+  </label>
+
+  <div class="pie-ficha">
+    <button class="btn primario" type="submit">Guardar</button>
+    <span class="guardado" id="aviso-guardado" hidden>Guardado ✓</span>
+  </div>
+
+  <dl class="tecnico">
+    <dt>Añadido</dt><dd>{{ doc.anadido|date:"d/m/Y H:i" }}</dd>
+    <dt>Tamaño</dt><dd>{{ doc.tamano_legible }}</dd>
+    <dt>Formato</dt><dd>{{ doc.extension|upper }}</dd>
+    <dt>Huella</dt><dd class="huella" title="{{ doc.hash }}">{{ doc.hash|slice:":12" }}…</dd>
+    {% if doc.paperless_id %}<dt>Paperless</dt><dd>#{{ doc.paperless_id }}</dd>{% endif %}
+  </dl>
+</form>

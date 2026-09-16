@@ -1,0 +1,62 @@
+{% extends "biblioteca/base.html" %}
+{% load biblioteca_extras %}
+{% block titulo %}Estado · Alejandria{% endblock %}
+{% block nav_estado %}activo{% endblock %}
+{% block contenido %}
+<main class="pagina">
+  <h1>Estado de la biblioteca</h1>
+
+  <div class="tarjetas-estado">
+    <div class="tarjeta-estado"><em>Documentos</em><strong>{{ total }}</strong></div>
+    <div class="tarjeta-estado"><em>Ocupan</em><strong>{{ bytes_totales|megas }}</strong></div>
+    <div class="tarjeta-estado"><em>Memoria del proceso</em><strong>{{ memoria }}</strong></div>
+    <div class="tarjeta-estado {% if problemas %}mala{% endif %}"><em>Ficheros ausentes</em><strong>{{ problemas }}</strong></div>
+    <div class="tarjeta-estado"><em>Disco usado</em><strong>{{ disco.usado_pct }}%</strong></div>
+  </div>
+
+  <section class="bloque">
+    <h2>Escanear la carpeta</h2>
+    <p>Recorre la biblioteca, da de alta lo nuevo, detecta lo que se ha movido y marca lo que falta.
+       No toca, mueve ni borra ningún fichero tuyo.</p>
+    <form method="post" action="{% url 'biblioteca:escanear' %}">
+      {% csrf_token %}
+      <button class="btn primario" {% if escaneo.corriendo %}disabled{% endif %}>
+        {% if escaneo.corriendo %}Escaneando…{% else %}Escanear ahora{% endif %}
+      </button>
+      <label class="interruptor"><input type="checkbox" name="rehashear" value="1"> Recalcular huellas de todo (más lento)</label>
+    </form>
+    {% if escaneo.resumen %}
+      <p class="resultado">Último escaneo: {{ escaneo.resumen.nuevos }} nuevos ·
+        {{ escaneo.resumen.actualizados }} actualizados · {{ escaneo.resumen.ausentes }} ausentes ·
+        {{ escaneo.resumen.vistos }} ficheros recorridos.</p>
+    {% endif %}
+  </section>
+
+  <section class="bloque">
+    <h2>Carpetas</h2>
+    <dl class="tecnico ancho">
+      <dt>Biblioteca</dt><dd>{{ rutas.biblioteca }}</dd>
+      <dt>Buzón de entrada</dt><dd>{{ rutas.entrada }}</dd>
+      <dt>Datos de Alejandria</dt><dd>{{ rutas.datos }}</dd>
+    </dl>
+  </section>
+
+  <section class="bloque">
+    <h2>Por formato</h2>
+    <ul class="barras">
+      {% for ext, n in por_extension %}
+        <li><span>{{ ext }}</span><i style="width:{{ n|porcentaje:total }}%"></i><em>{{ n }}</em></li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="bloque">
+    <h2>Registro</h2>
+    <ul class="registro">
+      {% for r in registro %}
+        <li class="{{ r.nivel }}"><time>{{ r.momento|date:"d/m H:i" }}</time> {{ r.mensaje }}</li>
+      {% empty %}<li class="nada">Sin actividad todavía.</li>{% endfor %}
+    </ul>
+  </section>
+</main>
+{% endblock %}
