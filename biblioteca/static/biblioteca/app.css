@@ -256,19 +256,6 @@ legend { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; colo
 .registro li.error { color: var(--peligro); }
 .resultado { font-size: 12.5px; color: var(--texto-suave); }
 
-/* --- Soltar ficheros --------------------------------------------------------- */
-/* pointer-events: none es deliberado: pase lo que pase con el JavaScript, este
-   cartel NUNCA puede impedir usar la aplicación de debajo. */
-#zona-soltar {
-  position: fixed; inset: 0; pointer-events: none; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--acento) 12%, transparent);
-}
-#zona-soltar div {
-  background: var(--panel); border: 2px dashed var(--acento); border-radius: 14px;
-  padding: 28px 46px; font-size: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
-}
-
 @media (max-width: 1100px) {
   .detalle { width: 340px; }
   .col-tipo, .col-tam { display: none; }

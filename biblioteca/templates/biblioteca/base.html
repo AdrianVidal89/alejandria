@@ -19,7 +19,7 @@
   </form>
 
   <nav class="acciones-barra">
-    <button type="button" class="btn" id="boton-subir" title="Añadir documentos">＋ Añadir</button>
+    <button type="button" class="btn" id="boton-subir">Subir documentos</button>
     <a class="btn {% block nav_organizar %}{% endblock %}" href="{% url 'biblioteca:organizar' %}">Organizar</a>
     <a class="btn {% block nav_estado %}{% endblock %}" href="{% url 'biblioteca:estado' %}">Estado</a>
     <button type="button" class="btn icono" id="boton-tema" title="Tema claro / oscuro">◐</button>
@@ -33,7 +33,6 @@
   {% csrf_token %}
   <input type="file" name="ficheros" id="ficheros" multiple>
 </form>
-<div id="zona-soltar" hidden><div>Suelta aquí los documentos</div></div>
 
 <script src="{% static 'biblioteca/app.js' %}" defer></script>
 {% block scripts %}{% endblock %}

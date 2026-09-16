@@ -1,6 +1,6 @@
 /* Alejandria — JavaScript de andar por casa: sin dependencias, sin compilar.
    Solo tres cosas: selección + teclado, refresco del panel de detalle por AJAX
-   y arrastrar ficheros a la ventana. Todo lo demás lo pinta Django. */
+   y subir ficheros con el botón. Todo lo demás lo pinta Django. */
 (function () {
   "use strict";
 
@@ -185,50 +185,14 @@
   }
   refrescarSeleccion();
 
-  /* --- Añadir documentos: botón y arrastrar sobre la ventana ---------------- */
+  /* --- Subir documentos (solo por botón) ------------------------------------ */
   const formSubida = $("#formulario-subida");
   const entradaFicheros = $("#ficheros");
-  const zona = $("#zona-soltar");
   const botonSubir = $("#boton-subir");
   if (botonSubir && entradaFicheros) {
     botonSubir.addEventListener("click", () => entradaFicheros.click());
     entradaFicheros.addEventListener("change", () => enviar(entradaFicheros.files));
   }
-  // La zona de soltar se controla con un temporizador, no contando entradas y
-  // salidas: mientras se arrastra algo encima, el navegador dispara "dragover"
-  // sin parar, así que basta con esconderla en cuanto dejan de llegar. Si el
-  // arrastre termina de cualquier forma rara —soltar fuera de la ventana, Escape,
-  // el navegador cancelando— desaparece sola. Contando eventos se quedaba pegada
-  // y tapaba la aplicación entera.
-  let temporizadorZona = null;
-
-  function mostrarZona() {
-    if (!zona) return;
-    zona.hidden = false;
-    clearTimeout(temporizadorZona);
-    temporizadorZona = setTimeout(ocultarZona, 250);
-  }
-
-  function ocultarZona() {
-    clearTimeout(temporizadorZona);
-    if (zona) zona.hidden = true;
-  }
-
-  window.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) mostrarZona();
-  });
-  window.addEventListener("dragend", ocultarZona);
-  window.addEventListener("mouseup", ocultarZona);
-  window.addEventListener("blur", ocultarZona);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") ocultarZona();
-  });
-  window.addEventListener("drop", (e) => {
-    e.preventDefault();
-    ocultarZona();
-    if (e.dataTransfer && e.dataTransfer.files.length) enviar(e.dataTransfer.files);
-  });
 
   function enviar(ficheros) {
     if (!ficheros || !ficheros.length || !formSubida) return;
@@ -240,7 +204,7 @@
       .then((r) => r.json())
       .then(() => location.reload())
       .catch(() => {
-        if (botonSubir) botonSubir.textContent = "＋ Añadir";
+        if (botonSubir) botonSubir.textContent = "Subir documentos";
         alert("No se pudieron subir los documentos.");
       });
   }
