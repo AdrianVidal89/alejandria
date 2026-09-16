@@ -194,22 +194,40 @@
     botonSubir.addEventListener("click", () => entradaFicheros.click());
     entradaFicheros.addEventListener("change", () => enviar(entradaFicheros.files));
   }
-  let arrastres = 0;
-  window.addEventListener("dragenter", (e) => {
-    if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes("Files")) return;
-    arrastres++;
-    if (zona) zona.hidden = false;
+  // La zona de soltar se controla con un temporizador, no contando entradas y
+  // salidas: mientras se arrastra algo encima, el navegador dispara "dragover"
+  // sin parar, así que basta con esconderla en cuanto dejan de llegar. Si el
+  // arrastre termina de cualquier forma rara —soltar fuera de la ventana, Escape,
+  // el navegador cancelando— desaparece sola. Contando eventos se quedaba pegada
+  // y tapaba la aplicación entera.
+  let temporizadorZona = null;
+
+  function mostrarZona() {
+    if (!zona) return;
+    zona.hidden = false;
+    clearTimeout(temporizadorZona);
+    temporizadorZona = setTimeout(ocultarZona, 250);
+  }
+
+  function ocultarZona() {
+    clearTimeout(temporizadorZona);
+    if (zona) zona.hidden = true;
+  }
+
+  window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    if (e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files")) mostrarZona();
   });
-  window.addEventListener("dragover", (e) => e.preventDefault());
-  window.addEventListener("dragleave", () => {
-    arrastres = Math.max(0, arrastres - 1);
-    if (!arrastres && zona) zona.hidden = true;
+  window.addEventListener("dragend", ocultarZona);
+  window.addEventListener("mouseup", ocultarZona);
+  window.addEventListener("blur", ocultarZona);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") ocultarZona();
   });
   window.addEventListener("drop", (e) => {
     e.preventDefault();
-    arrastres = 0;
-    if (zona) zona.hidden = true;
-    if (e.dataTransfer.files.length) enviar(e.dataTransfer.files);
+    ocultarZona();
+    if (e.dataTransfer && e.dataTransfer.files.length) enviar(e.dataTransfer.files);
   });
 
   function enviar(ficheros) {
