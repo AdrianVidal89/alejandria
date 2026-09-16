@@ -28,6 +28,11 @@ ORDENES = {
 FACETAS = ("etiqueta", "corresponsal", "tipo", "anio")
 
 
+def modo_etiquetas(peticion):
+    """«o» = con cualquiera de las etiquetas (por defecto). «y» = con todas."""
+    return "y" if peticion.GET.get("modo_etiquetas") == "y" else "o"
+
+
 def enteros(peticion, clave):
     valores = []
     for bruto in peticion.GET.getlist(clave):
@@ -101,11 +106,16 @@ def _faceta(qs, clave, valores, peticion):
     if not valores:
         return qs
     if clave == "etiqueta":
-        # Una llamada a filter() por etiqueta = se exigen TODAS (cada una con su
-        # rama). Ir pulsando etiquetas va estrechando la búsqueda, en vez de
-        # ampliarla, que es lo que se espera al navegar un archivo.
-        for uno in valores:
-            qs = qs.filter(etiquetas__in=rama_de([uno]))
+        if modo_etiquetas(peticion) == "y":
+            # Una llamada a filter() por etiqueta: se exigen TODAS, cada una con
+            # su rama. Útil con etiquetas transversales (Urgente + Fiscal).
+            for uno in valores:
+                qs = qs.filter(etiquetas__in=rama_de([uno]))
+        else:
+            # Por defecto suman. Es lo que hace falta cuando las etiquetas vienen
+            # de carpetas y por tanto se excluyen entre sí: exigirlas todas daría
+            # siempre cero y no se podría elegir una segunda.
+            qs = qs.filter(etiquetas__in=rama_de(valores))
         return qs.distinct()
     if clave == "corresponsal":
         return qs.filter(corresponsal_id__in=valores)
@@ -169,6 +179,7 @@ def filtrar(peticion):
         "hasta": get.get("hasta", ""),
         "campo": get.get("campo", ""),
         "valor": get.get("valor", ""),
+        "modo_etiquetas": modo_etiquetas(peticion),
         "hay_filtros": bool(
             texto or get.get("vista") or get.get("ext") or get.get("carpeta")
             or any(elegido.values())
@@ -189,7 +200,12 @@ def recuento_etiquetas(peticion):
     un documento etiquetado a la vez con «Vehiculos» y «Vehiculos/Volvo» tiene
     que contar una sola vez en la rama de «Vehiculos».
     """
-    base = conjunto(peticion)
+    # Sumando (O), el recuento de cada etiqueta se calcula sin aplicar el filtro
+    # de etiquetas, o al elegir una las demás se irían a cero y no se podrían
+    # añadir. Exigiéndolas todas (Y) sí se aplica: cada número dice cuántos
+    # quedarían al añadir esa.
+    excepto = {"etiqueta"} if modo_etiquetas(peticion) == "o" else set()
+    base = conjunto(peticion, excepto=excepto)
     pares = (
         Documento.etiquetas.through.objects
         .filter(documento_id__in=base.values("pk"))

@@ -58,6 +58,14 @@
       <p class="nada">Ninguna con documentos aquí.</p>
     {% endfor %}
   </div>
+  {% if filtros.etiquetas_sel|length > 1 %}
+    <div class="modo-etiquetas" title="Cómo se combinan las etiquetas elegidas">
+      <a class="{% if filtros.modo_etiquetas != 'y' %}activo{% endif %}"
+         href="?{% consulta modo_etiquetas=None %}">con cualquiera</a>
+      <a class="{% if filtros.modo_etiquetas == 'y' %}activo{% endif %}"
+         href="?{% consulta modo_etiquetas='y' %}">con todas</a>
+    </div>
+  {% endif %}
 </details>
 
 <details class="grupo" {% if corresponsales %}open{% endif %}>
