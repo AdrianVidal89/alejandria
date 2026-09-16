@@ -21,6 +21,7 @@ exec gunicorn alejandria.wsgi:application \
     --workers "${ALEJANDRIA_WORKERS:-1}" \
     --threads "${ALEJANDRIA_HILOS:-4}" \
     --worker-class gthread \
+    --no-control-socket \
     --max-requests 800 \
     --max-requests-jitter 100 \
     --timeout 120 \
