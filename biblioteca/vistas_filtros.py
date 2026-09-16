@@ -29,8 +29,15 @@ FACETAS = ("etiqueta", "corresponsal", "tipo", "anio")
 
 
 def modo_etiquetas(peticion):
-    """«o» = con cualquiera de las etiquetas (por defecto). «y» = con todas."""
-    return "y" if peticion.GET.get("modo_etiquetas") == "y" else "o"
+    """Cómo se combinan varias etiquetas elegidas.
+
+    «y» (por defecto) = filtro doble: se exigen todas. Al elegir una, en la barra
+    lateral solo quedan las que conviven con ella en algún documento, así que
+    cada clic estrecha de verdad la búsqueda.
+    «o» = suman. Necesario cuando las etiquetas se excluyen entre sí, como las
+    que salen de las carpetas, donde exigir dos daría siempre cero.
+    """
+    return "o" if peticion.GET.get("modo_etiquetas") == "o" else "y"
 
 
 def enteros(peticion, clave):
@@ -204,7 +211,7 @@ def recuento_etiquetas(peticion):
     # de etiquetas, o al elegir una las demás se irían a cero y no se podrían
     # añadir. Exigiéndolas todas (Y) sí se aplica: cada número dice cuántos
     # quedarían al añadir esa.
-    excepto = {"etiqueta"} if modo_etiquetas(peticion) == "o" else set()
+    excepto = {"etiqueta"} if modo_etiquetas(peticion) == "o" else set()  # ver modo_etiquetas()
     base = conjunto(peticion, excepto=excepto)
     pares = (
         Documento.etiquetas.through.objects

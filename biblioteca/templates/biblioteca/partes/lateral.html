@@ -58,13 +58,19 @@
       <p class="nada">Ninguna con documentos aquí.</p>
     {% endfor %}
   </div>
-  {% if filtros.etiquetas_sel|length > 1 %}
-    <div class="modo-etiquetas" title="Cómo se combinan las etiquetas elegidas">
-      <a class="{% if filtros.modo_etiquetas != 'y' %}activo{% endif %}"
-         href="?{% consulta modo_etiquetas=None %}">con cualquiera</a>
+  {% if filtros.etiquetas_sel %}
+    <div class="modo-etiquetas">
       <a class="{% if filtros.modo_etiquetas == 'y' %}activo{% endif %}"
-         href="?{% consulta modo_etiquetas='y' %}">con todas</a>
+         href="?{% consulta modo_etiquetas=None %}"
+         title="Solo los documentos que tengan todas las etiquetas elegidas">que tengan todas</a>
+      <a class="{% if filtros.modo_etiquetas == 'o' %}activo{% endif %}"
+         href="?{% consulta modo_etiquetas='o' %}"
+         title="Los documentos que tengan cualquiera de las etiquetas elegidas">o cualquiera</a>
     </div>
+    {% if filtros.modo_etiquetas == 'y' and arbol|length == filtros.etiquetas_sel|length %}
+      <p class="nada">Ninguna otra etiqueta convive con esta en un mismo documento.
+         Pulsa «o cualquiera» para sumar etiquetas en vez de cruzarlas.</p>
+    {% endif %}
   {% endif %}
 </details>
 
