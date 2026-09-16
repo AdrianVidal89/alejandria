@@ -24,7 +24,6 @@ services:
     env_file: .env
     environment:
       - ALEJANDRIA_VIGILANTE=0        # el vigilante va en su propio contenedor
-      - ALEJANDRIA_ACCEL=/interno/    # nginx entrega los ficheros, no Django
     volumes:
       - ${BIBLIOTECA:?define BIBLIOTECA en .env}:/biblioteca
       - ${ENTRADA:?define ENTRADA en .env}:/entrada
@@ -68,7 +67,6 @@ services:
       - "${PUERTO:-8890}:80"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ${BIBLIOTECA:?}:/biblioteca:ro
     mem_limit: 24m
     depends_on:
       - web

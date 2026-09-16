@@ -25,8 +25,11 @@ contenedores, con un consumo real en reposo de 200-230 MB.
    SQLite. Es lo que hace que quepa en un NAS.
 4. **Las miniaturas se generan fuera de Python**, con `pdftoppm` o
    `vipsthumbnail`, bajo demanda, con límite de memoria y de tiempo, y se cachean.
-5. **Los PDFs los entrega nginx**, no Django (`X-Accel-Redirect`). Da igual que un
-   documento pese 300 MB: la memoria del proceso web no se mueve.
+5. **Los documentos se envían a trozos**, nunca se cargan enteros. Servir un PDF de
+   300 MB sube el consumo de 70 a 72 MB y vuelve a bajar. Se puede delegar la entrega en
+   nginx (`X-Accel-Redirect`, variable `ALEJANDRIA_ACCEL`) para ahorrar algo de CPU, pero
+   exige que nginx pueda leer la carpeta de documentos — en un NAS con permisos de grupo
+   cerrados no puede, y devuelve 403. Por eso viene desactivado.
 
 ## Qué hace
 
