@@ -77,33 +77,60 @@
     <input type="text" name="etiquetas_nuevas" placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
   </fieldset>
 
-  {% if campos_documento %}
-  <fieldset>
+  <fieldset class="campos">
     <legend>Campos personalizados</legend>
-    {% for fila in campos_documento %}
-      <label class="campo">{{ fila.campo.nombre }}
-        {% if fila.campo.tipo == 'booleano' %}
-          <select name="campo_{{ fila.campo.pk }}">
+    {% for v in campos_usados %}
+      <label class="campo">{{ v.campo.nombre }}
+        {% if v.campo.tipo == 'booleano' %}
+          <select name="campo_{{ v.campo.pk }}">
             <option value="">—</option>
-            <option value="1" {% if fila.valor.valor == '1' %}selected{% endif %}>Sí</option>
-            <option value="0" {% if fila.valor.valor == '0' %}selected{% endif %}>No</option>
+            <option value="1" {% if v.valor == '1' %}selected{% endif %}>Sí</option>
+            <option value="0" {% if v.valor == '0' %}selected{% endif %}>No</option>
           </select>
-        {% elif fila.campo.tipo == 'seleccion' %}
-          <select name="campo_{{ fila.campo.pk }}">
+        {% elif v.campo.tipo == 'seleccion' %}
+          <select name="campo_{{ v.campo.pk }}">
             <option value="">—</option>
-            {% for o in fila.campo.opciones %}
-              <option value="{{ o }}" {% if fila.valor.valor == o %}selected{% endif %}>{{ o }}</option>
+            {% for o in v.campo.opciones %}
+              <option value="{{ o }}" {% if v.valor == o %}selected{% endif %}>{{ o }}</option>
             {% endfor %}
           </select>
         {% else %}
-          <input type="{% if fila.campo.tipo == 'fecha' %}date{% elif fila.campo.tipo == 'numero' or fila.campo.tipo == 'moneda' %}number{% elif fila.campo.tipo == 'url' %}url{% else %}text{% endif %}"
-                 {% if fila.campo.tipo == 'moneda' %}step="0.01"{% endif %}
-                 name="campo_{{ fila.campo.pk }}" value="{{ fila.valor.valor|default:'' }}">
+          <input type="{% if v.campo.tipo == 'fecha' %}date{% elif v.campo.tipo == 'numero' or v.campo.tipo == 'moneda' %}number{% elif v.campo.tipo == 'url' %}url{% else %}text{% endif %}"
+                 {% if v.campo.tipo == 'moneda' %}step="0.01"{% endif %}
+                 name="campo_{{ v.campo.pk }}" value="{{ v.valor }}">
         {% endif %}
+        <small class="pista">Vacíalo para quitar el campo de este documento.</small>
       </label>
+    {% empty %}
+      <p class="nada">Ninguno todavía.</p>
     {% endfor %}
+
+    <button type="button" class="btn mini" id="boton-anadir-campo">+ Añadir campo</button>
+
+    <div id="anadir-campo" hidden>
+      <label>Campo
+        <select name="campo_anadir" id="selector-campo">
+          <option value="">— crear uno nuevo —</option>
+          {% for c in campos_disponibles %}
+            <option value="{{ c.pk }}">{{ c.nombre }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div id="campo-nuevo">
+        <label>Nombre del campo nuevo
+          <input type="text" name="campo_nuevo_nombre" placeholder="Importe, Vencimiento, Garantía…">
+        </label>
+        <label>Tipo
+          <select name="campo_nuevo_tipo">
+            {% for clave, etiqueta in tipos_campo %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <label>Valor
+        <input type="text" name="campo_nuevo_valor" placeholder="Se guarda al pulsar Guardar">
+      </label>
+    </div>
   </fieldset>
-  {% endif %}
 
   <label>Notas
     <textarea name="notas" rows="4" placeholder="Anotaciones, contexto, dónde está el original en papel…">{{ doc.notas }}</textarea>

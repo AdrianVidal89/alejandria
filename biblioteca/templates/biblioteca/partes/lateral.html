@@ -1,70 +1,91 @@
 {% load biblioteca_extras %}
-<div class="grupo">
-  <h3>Colecciones</h3>
-  <a class="fila-lateral {% if not filtros.vista %}activa{% endif %}"
-     href="?{% consulta vista=None etiqueta=None corresponsal=None tipo=None anio=None carpeta=None %}">
-    <span>📚 Todos</span><em>{{ totales.todos }}</em></a>
-  <a class="fila-lateral {% if filtros.vista == 'favoritos' %}activa{% endif %}" href="?{% consulta vista='favoritos' %}">
-    <span>★ Favoritos</span><em>{{ totales.favoritos }}</em></a>
-  <a class="fila-lateral {% if filtros.vista == 'sin_clasificar' %}activa{% endif %}" href="?{% consulta vista='sin_clasificar' %}">
-    <span>📥 Sin clasificar</span><em>{{ totales.sin_clasificar }}</em></a>
-  {% if totales.problemas %}
-  <a class="fila-lateral aviso {% if filtros.vista == 'problemas' %}activa{% endif %}" href="?{% consulta vista='problemas' %}">
-    <span>⚠ Ficheros ausentes</span><em>{{ totales.problemas }}</em></a>
-  {% endif %}
-  <a class="fila-lateral {% if filtros.vista == 'papelera' %}activa{% endif %}" href="?{% consulta vista='papelera' %}">
-    <span>🗑 Papelera</span><em>{{ totales.papelera }}</em></a>
-</div>
-
-{% if guardadas %}
-<div class="grupo">
-  <h3>Búsquedas guardadas</h3>
-  {% for g in guardadas %}
-    <a class="fila-lateral" href="?{{ g.consulta }}"><span>{{ g.icono }} {{ g.nombre }}</span></a>
-  {% endfor %}
+{% if activos %}
+<div class="grupo activos">
+  <h3>Filtrando por <a class="mini" href="{% url 'biblioteca:biblioteca' %}">limpiar todo</a></h3>
+  <div class="pastillas">
+    {% for f in activos %}
+      <a class="pastilla {{ f.clase }}" href="?{% quitar_filtro f.clave f.valor %}"
+         title="Quitar este filtro">
+        {% if f.color %}<i class="punto" style="background:{{ f.color }}"></i>{% endif %}
+        {{ f.texto }}<span class="quitar">×</span>
+      </a>
+    {% endfor %}
+  </div>
 </div>
 {% endif %}
 
-<div class="grupo">
-  <h3>Etiquetas <a class="mini" href="{% url 'biblioteca:organizar' %}#etiquetas">editar</a></h3>
-  {% for e in arbol %}
-    <a class="fila-lateral {% if e.pk in filtros.etiquetas_sel %}activa{% endif %}"
-       style="padding-left:{{ e.nivel|sangria }}px"
-       href="?{% alterna_consulta 'etiqueta' e.pk %}">
-      <span><i class="punto" style="background:{{ e.color }}"></i>{{ e.nombre }}</span>
-      <em>{{ e.total }}</em>
-    </a>
-  {% empty %}
-    <p class="nada">Sin etiquetas todavía.</p>
+<details class="grupo" open>
+  <summary><h3>Colecciones</h3></summary>
+  <a class="fila-lateral {% if not filtros.vista %}activa{% endif %}"
+     href="?{% consulta vista=None %}">
+    <span>Todos</span><em>{{ totales.todos }}</em></a>
+  <a class="fila-lateral {% if filtros.vista == 'favoritos' %}activa{% endif %}" href="?{% consulta vista='favoritos' %}">
+    <span>Favoritos</span><em>{{ totales.favoritos }}</em></a>
+  <a class="fila-lateral {% if filtros.vista == 'sin_clasificar' %}activa{% endif %}" href="?{% consulta vista='sin_clasificar' %}">
+    <span>Sin clasificar</span><em>{{ totales.sin_clasificar }}</em></a>
+  {% if totales.problemas %}
+  <a class="fila-lateral aviso {% if filtros.vista == 'problemas' %}activa{% endif %}" href="?{% consulta vista='problemas' %}">
+    <span>Ficheros ausentes</span><em>{{ totales.problemas }}</em></a>
+  {% endif %}
+  <a class="fila-lateral {% if filtros.vista == 'papelera' %}activa{% endif %}" href="?{% consulta vista='papelera' %}">
+    <span>Papelera</span><em>{{ totales.papelera }}</em></a>
+</details>
+
+{% if guardadas %}
+<details class="grupo" open>
+  <summary><h3>Búsquedas guardadas</h3></summary>
+  {% for g in guardadas %}
+    <a class="fila-lateral" href="?{{ g.consulta }}"><span>{{ g.icono }} {{ g.nombre }}</span></a>
   {% endfor %}
-</div>
+</details>
+{% endif %}
 
-<div class="grupo plegable">
-  <h3>Corresponsales</h3>
-  <div class="lista-plegada">
+<details class="grupo" open id="grupo-etiquetas">
+  <summary><h3>Etiquetas <a class="mini" href="{% url 'biblioteca:organizar' %}#etiquetas">editar</a></h3></summary>
+  {% if arbol|length > 10 %}
+    <input type="search" class="filtro-lista" placeholder="Filtrar etiquetas…"
+           data-filtra="#lista-etiquetas" autocomplete="off">
+  {% endif %}
+  <div class="lista-facetas" id="lista-etiquetas">
+    {% for e in arbol %}
+      <a class="fila-lateral faceta {% if e.elegida %}activa{% endif %}"
+         style="padding-left:{{ e.nivel|sangria }}px"
+         href="?{% alterna_consulta 'etiqueta' e.pk %}" data-nombre="{{ e.nombre|lower }}">
+        <span><i class="punto" style="background:{{ e.color }}"></i>{{ e.nombre }}</span>
+        <em>{{ e.total }}</em>
+      </a>
+    {% empty %}
+      <p class="nada">Ninguna con documentos aquí.</p>
+    {% endfor %}
+  </div>
+</details>
+
+<details class="grupo" {% if corresponsales %}open{% endif %}>
+  <summary><h3>Corresponsales</h3></summary>
+  <div class="lista-facetas">
   {% for c in corresponsales %}
-    <a class="fila-lateral {% if c.pk in filtros.corresponsales_sel %}activa{% endif %}"
-       href="?{% alterna_consulta 'corresponsal' c.pk %}"><span>{{ c.nombre }}</span><em>{{ c.n }}</em></a>
-  {% empty %}<p class="nada">Ninguno.</p>{% endfor %}
+    <a class="fila-lateral faceta {% if c.elegido %}activa{% endif %}"
+       href="?{% alterna_consulta 'corresponsal' c.pk %}"><span>{{ c.nombre }}</span><em>{{ c.total }}</em></a>
+  {% empty %}<p class="nada">Ninguno aquí.</p>{% endfor %}
   </div>
-</div>
+</details>
 
-<div class="grupo plegable">
-  <h3>Tipos</h3>
-  <div class="lista-plegada">
+<details class="grupo" {% if tipos %}open{% endif %}>
+  <summary><h3>Tipos</h3></summary>
+  <div class="lista-facetas">
   {% for t in tipos %}
-    <a class="fila-lateral {% if t.pk in filtros.tipos_sel %}activa{% endif %}"
-       href="?{% alterna_consulta 'tipo' t.pk %}"><span>{{ t.nombre }}</span><em>{{ t.n }}</em></a>
-  {% empty %}<p class="nada">Ninguno.</p>{% endfor %}
+    <a class="fila-lateral faceta {% if t.elegido %}activa{% endif %}"
+       href="?{% alterna_consulta 'tipo' t.pk %}"><span>{{ t.nombre }}</span><em>{{ t.total }}</em></a>
+  {% empty %}<p class="nada">Ninguno aquí.</p>{% endfor %}
   </div>
-</div>
+</details>
 
-<div class="grupo plegable">
-  <h3>Años</h3>
-  <div class="lista-plegada anios">
+<details class="grupo" {% if anios %}open{% endif %}>
+  <summary><h3>Años</h3></summary>
+  <div class="anios">
   {% for a in anios %}
-    <a class="chip {% if a.fecha__year in filtros.anios_sel %}activa{% endif %}"
-       href="?{% alterna_consulta 'anio' a.fecha__year %}">{{ a.fecha__year }} <em>{{ a.n }}</em></a>
+    <a class="chip {% if a.elegido %}activa{% endif %}"
+       href="?{% alterna_consulta 'anio' a.anio %}">{{ a.anio }} <em>{{ a.n }}</em></a>
   {% empty %}<p class="nada">Sin fechas.</p>{% endfor %}
   </div>
-</div>
+</details>

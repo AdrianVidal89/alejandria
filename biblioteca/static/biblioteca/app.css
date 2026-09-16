@@ -100,28 +100,72 @@ input, select, textarea, button { font: inherit; color: inherit; }
 .tirador:hover { background: var(--acento-flojo); }
 
 /* --- Lateral --------------------------------------------------------------- */
+/* Criterio: una sola forma de fila para todos los filtros, el número siempre en
+   el mismo sitio y sin colores compitiendo. Lo que distingue a un filtro puesto
+   es una barra de acento a la izquierda, no un fondo llamativo. */
 .grupo { border-bottom: 1px solid var(--borde); padding-bottom: 8px; }
-.grupo h3 .mini { float: right; font-size: 10px; color: var(--acento); text-transform: none; letter-spacing: 0; }
+.grupo > summary { list-style: none; cursor: pointer; }
+.grupo > summary::-webkit-details-marker { display: none; }
+.grupo > summary h3 { display: flex; align-items: center; justify-content: space-between; }
+.grupo > summary h3::after {
+  content: "⌄"; font-size: 13px; color: var(--texto-suave); transition: transform .15s;
+}
+.grupo[open] > summary h3::after { transform: rotate(180deg); }
+.grupo > summary:hover h3 { color: var(--texto); }
+.grupo h3 .mini { font-size: 10px; color: var(--acento); text-transform: none; letter-spacing: 0; margin-left: auto; margin-right: 8px; }
+
 .fila-lateral {
   display: flex; align-items: center; justify-content: space-between; gap: 6px;
-  padding: 4px 12px; border-radius: 5px; margin: 0 6px; cursor: pointer;
+  padding: 4px 10px 4px 12px; margin: 0 6px; border-radius: 5px;
+  border-left: 2px solid transparent; cursor: pointer;
 }
 .fila-lateral span { display: flex; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fila-lateral em { font-style: normal; font-size: 11px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.fila-lateral em {
+  font-style: normal; font-size: 11px; color: var(--texto-suave);
+  font-variant-numeric: tabular-nums; flex: 0 0 auto;
+}
 .fila-lateral:hover { background: var(--borde); }
-.fila-lateral.activa { background: var(--seleccion-fuerte); font-weight: 600; }
+.fila-lateral.activa {
+  background: var(--seleccion); border-left-color: var(--acento); font-weight: 600;
+}
+.fila-lateral.activa em { color: var(--texto); }
 .fila-lateral.aviso span { color: var(--peligro); }
-.punto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+.punto { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
 .nada { color: var(--texto-suave); font-size: 12px; margin: 4px 12px; }
 .nada.grande { padding: 40px 12px; text-align: center; font-size: 14px; }
-.lista-plegada { max-height: 230px; overflow: auto; }
+
+.lista-facetas { max-height: 300px; overflow-y: auto; }
+.filtro-lista {
+  width: calc(100% - 24px); margin: 2px 12px 6px; padding: 4px 8px; font-size: 12px;
+  border: 1px solid var(--borde-fuerte); border-radius: 5px; background: var(--panel);
+}
+.modo-etiquetas { display: flex; gap: 4px; margin: 6px 12px 0; font-size: 11px; }
+.modo-etiquetas a {
+  padding: 2px 8px; border-radius: 10px; border: 1px solid var(--borde-fuerte);
+  color: var(--texto-suave);
+}
+.modo-etiquetas a.activo { background: var(--acento); border-color: var(--acento); color: #fff; }
+
+/* Filtros puestos, arriba del todo y quitables de un clic. */
+.activos { background: var(--acento-flojo); }
+.pastillas { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 12px 4px; }
+.pastilla {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px;
+  padding: 2px 6px 2px 9px; border-radius: 12px; background: var(--panel);
+  border: 1px solid var(--borde-fuerte); max-width: 100%;
+}
+.pastilla:hover { border-color: var(--peligro); }
+.pastilla .quitar { color: var(--texto-suave); font-size: 14px; line-height: 1; }
+.pastilla:hover .quitar { color: var(--peligro); }
+
 .anios { display: flex; flex-wrap: wrap; gap: 5px; padding: 2px 12px; }
 .chip {
   display: inline-flex; gap: 5px; align-items: center; padding: 2px 8px; border-radius: 12px;
   border: 1px solid var(--borde-fuerte); background: var(--panel); font-size: 12px;
 }
-.chip.activa { background: var(--seleccion-fuerte); border-color: var(--acento); }
+.chip.activa { background: var(--acento); border-color: var(--acento); color: #fff; }
 .chip em { font-style: normal; color: var(--texto-suave); font-size: 11px; }
+.chip.activa em { color: rgba(255, 255, 255, .75); }
 
 /* --- Cabecera de lista ------------------------------------------------------ */
 .cabecera-lista {
@@ -219,6 +263,15 @@ legend { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; colo
   border-color: color-mix(in srgb, var(--c, #888) 60%, transparent); font-weight: 600;
 }
 .campo { margin-top: 6px; }
+.campos { display: flex; flex-direction: column; gap: 6px; }
+.campos .pista { font-size: 10px; color: var(--texto-suave); font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0; transition: opacity .15s; }
+.campos label:focus-within .pista { opacity: 1; }
+#boton-anadir-campo { align-self: flex-start; margin-top: 4px; }
+#anadir-campo {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding: 8px;
+  border: 1px dashed var(--borde-fuerte); border-radius: var(--radio); background: var(--panel);
+}
+#campo-nuevo { display: flex; flex-direction: column; gap: 6px; }
 .pie-ficha { display: flex; align-items: center; gap: 10px; }
 .guardado { color: var(--acento); font-size: 12px; }
 .tecnico { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 11.5px; color: var(--texto-suave); margin: 4px 0 0; }

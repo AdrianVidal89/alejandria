@@ -22,6 +22,16 @@ def alterna_consulta(context, clave, valor):
     return mark_safe(consulta_actual(peticion, **{clave: alternar(actuales, valor) or None}))
 
 
+@registrar.simple_tag(takes_context=True)
+def quitar_filtro(context, clave, valor=None):
+    """Enlace que quita un filtro concreto (o todos los de esa clave)."""
+    peticion = context["request"]
+    if valor in (None, ""):
+        return mark_safe(consulta_actual(peticion, **{clave: None}))
+    restantes = [v for v in enteros(peticion, clave) if v != int(valor)]
+    return mark_safe(consulta_actual(peticion, **{clave: restantes or None}))
+
+
 @registrar.filter
 def sangria(nivel):
     return 12 + int(nivel) * 14

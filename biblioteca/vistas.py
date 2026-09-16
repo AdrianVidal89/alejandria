@@ -29,7 +29,10 @@ from .models import (
     BusquedaGuardada, CampoPersonalizado, Corresponsal, Documento, Etiqueta,
     Registro, TipoDocumento, ValorCampo,
 )
-from .vistas_filtros import ORDENES, consulta_actual, facetas, filtrar
+from .vistas_filtros import (
+    ORDENES, conjunto, consulta_actual, enteros, filtrar, recuento_etiquetas,
+    recuento_simple,
+)
 
 log = logging.getLogger(__name__)
 
@@ -47,75 +50,114 @@ def acceso(vista):
 
 
 # --- Barra lateral ------------------------------------------------------------
-# Cuenta, para cada etiqueta, los documentos de toda su rama SIN duplicar los que
-# lleven a la vez la etiqueta padre y la hija. Una sola consulta recursiva de
-# SQLite en lugar de traerse la tabla de relaciones entera a Python.
-CONSULTA_RAMAS = """
-WITH RECURSIVE rama(raiz, nodo) AS (
-    SELECT id, id FROM biblioteca_etiqueta
-    UNION
-    SELECT r.raiz, e.id FROM biblioteca_etiqueta e JOIN rama r ON e.padre_id = r.nodo
-)
-SELECT r.raiz, COUNT(DISTINCT rel.documento_id)
-FROM rama r
-JOIN biblioteca_documento_etiquetas rel ON rel.etiqueta_id = r.nodo
-JOIN biblioteca_documento d ON d.id = rel.documento_id AND d.papelera = 0
-GROUP BY r.raiz
-"""
+def _arbol_etiquetas(peticion):
+    """Etiquetas en árbol con el recuento de documentos que quedan bajo cada una.
 
+    Se esconden las que no tienen ningún documento en el conjunto filtrado — que
+    es lo que evita el caos visual cuando hay muchas — salvo que estén
+    seleccionadas o que alguna hija suya siga siendo visible.
+    """
+    totales, propios = recuento_etiquetas(peticion)
+    elegidas = set(enteros(peticion, "etiqueta"))
 
-def _arbol_etiquetas():
-    """Etiquetas en árbol, cada una con el recuento real de su rama."""
-    from django.db import connection
-
-    with connection.cursor() as c:
-        c.execute(CONSULTA_RAMAS)
-        totales = dict(c.fetchall())
-
-    etiquetas = list(
-        Etiqueta.objects.annotate(
-            n=Count("documentos", filter=Q(documentos__papelera=False), distinct=True)
-        )
-    )
-    por_padre = {}
+    etiquetas = list(Etiqueta.objects.all())
+    hijas = {}
     for e in etiquetas:
-        por_padre.setdefault(e.padre_id, []).append(e)
+        hijas.setdefault(e.padre_id, []).append(e)
 
     def rama(padre_id, nivel=0):
-        plano = []
-        for e in sorted(por_padre.get(padre_id, []), key=lambda x: x.nombre.lower()):
+        salida = []
+        for e in sorted(hijas.get(padre_id, []), key=lambda x: x.nombre.lower()):
+            debajo = rama(e.pk, nivel + 1)
             e.nivel = nivel
             e.total = totales.get(e.pk, 0)
-            plano.append(e)
-            plano.extend(rama(e.pk, nivel + 1))
-        return plano
+            e.propios = propios.get(e.pk, 0)
+            e.elegida = e.pk in elegidas
+            e.tiene_hijas = bool(hijas.get(e.pk))
+            if e.total or e.elegida or debajo:
+                salida.append(e)
+                salida.extend(debajo)
+        return salida
 
     return rama(None)
 
 
-def contexto_lateral(peticion, filtros):
-    base = Documento.objects.filter(papelera=False)
+def contexto_lateral(peticion):
+    cuenta_corr = recuento_simple(peticion, "corresponsal", "corresponsal")
+    cuenta_tipo = recuento_simple(peticion, "tipo", "tipo")
+    cuenta_anio = recuento_simple(peticion, "anio", "fecha__year")
+
+    elegidos_corr = set(enteros(peticion, "corresponsal"))
+    elegidos_tipo = set(enteros(peticion, "tipo"))
+    elegidos_anio = set(enteros(peticion, "anio"))
+
+    corresponsales = []
+    for c in Corresponsal.objects.all():
+        c.total = cuenta_corr.get(c.pk, 0)
+        c.elegido = c.pk in elegidos_corr
+        if c.total or c.elegido:
+            corresponsales.append(c)
+
+    tipos = []
+    for t in TipoDocumento.objects.all():
+        t.total = cuenta_tipo.get(t.pk, 0)
+        t.elegido = t.pk in elegidos_tipo
+        if t.total or t.elegido:
+            tipos.append(t)
+
+    anios = [
+        {"anio": a, "n": cuenta_anio.get(a, 0), "elegido": a in elegidos_anio}
+        for a in sorted(set(cuenta_anio) | elegidos_anio, reverse=True)
+    ]
+
+    # Las colecciones se cuentan con todos los filtros puestos menos el ámbito,
+    # para que digan cuántos de los documentos que estás viendo son favoritos.
+    ambito = conjunto(peticion, excepto={"vista"})
+
     return {
-        "arbol": _arbol_etiquetas(),
-        "corresponsales": Corresponsal.objects.annotate(
-            n=Count("documentos", filter=Q(documentos__papelera=False))
-        ).filter(n__gt=0),
-        "tipos": TipoDocumento.objects.annotate(
-            n=Count("documentos", filter=Q(documentos__papelera=False))
-        ).filter(n__gt=0),
-        "anios": facetas(base),
+        "arbol": _arbol_etiquetas(peticion),
+        "corresponsales": corresponsales,
+        "tipos": tipos,
+        "anios": anios,
         "guardadas": BusquedaGuardada.objects.all(),
         "campos": CampoPersonalizado.objects.all(),
         "totales": {
-            "todos": base.count(),
-            "favoritos": base.filter(favorito=True).count(),
-            "sin_clasificar": base.filter(
+            "todos": ambito.count(),
+            "favoritos": ambito.filter(favorito=True).count(),
+            "sin_clasificar": ambito.filter(
                 etiquetas__isnull=True, corresponsal__isnull=True, tipo__isnull=True
             ).count(),
+            "problemas": ambito.exclude(estado=Documento.OK).count(),
             "papelera": Documento.objects.filter(papelera=True).count(),
-            "problemas": base.exclude(estado=Documento.OK).count(),
         },
+        "activos": _filtros_activos(peticion),
     }
+
+
+def _filtros_activos(peticion):
+    """Lista de los filtros puestos, para pintarlos como pastillas quitables."""
+    activos = []
+    get = peticion.GET
+    if get.get("q"):
+        activos.append({"clase": "busqueda", "clave": "q", "valor": None,
+                        "texto": f"«{get['q']}»"})
+    for e in Etiqueta.objects.filter(pk__in=enteros(peticion, "etiqueta")):
+        activos.append({"clase": "etiqueta", "clave": "etiqueta", "valor": e.pk,
+                        "texto": e.ruta_nombre, "color": e.color})
+    for c in Corresponsal.objects.filter(pk__in=enteros(peticion, "corresponsal")):
+        activos.append({"clase": "corresponsal", "clave": "corresponsal", "valor": c.pk,
+                        "texto": c.nombre})
+    for t in TipoDocumento.objects.filter(pk__in=enteros(peticion, "tipo")):
+        activos.append({"clase": "tipo", "clave": "tipo", "valor": t.pk, "texto": t.nombre})
+    for a in enteros(peticion, "anio"):
+        activos.append({"clase": "anio", "clave": "anio", "valor": a, "texto": str(a)})
+    if get.get("carpeta"):
+        activos.append({"clase": "carpeta", "clave": "carpeta", "valor": None,
+                        "texto": get["carpeta"]})
+    if get.get("ext"):
+        activos.append({"clase": "ext", "clave": "ext", "valor": None,
+                        "texto": get["ext"].upper()})
+    return activos
 
 
 # --- Listado ------------------------------------------------------------------
@@ -139,7 +181,7 @@ def biblioteca(peticion):
         "actual": actual,
         "presentacion": peticion.GET.get("modo", peticion.COOKIES.get("modo", "lista")),
         "consulta": consulta_actual(peticion),
-        **contexto_lateral(peticion, filtros),
+        **contexto_lateral(peticion),
     }
     if actual is not None:
         contexto.update(_contexto_documento(actual))
@@ -156,13 +198,18 @@ def biblioteca(peticion):
 
 
 def _contexto_documento(doc):
-    valores = {v.campo_id: v for v in doc.valores.select_related("campo")}
-    campos = []
-    for campo in CampoPersonalizado.objects.all():
-        campos.append({"campo": campo, "valor": valores.get(campo.pk)})
+    """Solo se muestran los campos que este documento usa.
+
+    Enseñar los quince campos de la biblioteca en cada ficha es ruido: la mayoría
+    están vacíos. Los que no usa quedan detrás del botón de añadir.
+    """
+    usados = list(doc.valores.select_related("campo").order_by("campo__nombre"))
+    ids_usados = {v.campo_id for v in usados}
     return {
         "doc": doc,
-        "campos_documento": campos,
+        "campos_usados": usados,
+        "campos_disponibles": CampoPersonalizado.objects.exclude(pk__in=ids_usados),
+        "tipos_campo": CampoPersonalizado.TIPOS,
         "etiquetas_todas": Etiqueta.objects.all(),
         "corresponsales_todos": Corresponsal.objects.all(),
         "tipos_todos": TipoDocumento.objects.all(),
@@ -219,6 +266,26 @@ def guardar(peticion, pk):
         etiquetas.append(etiqueta.pk)
     doc.etiquetas.set(etiquetas)
 
+    # Añadir un campo desde la ficha: o uno que ya existe, o uno recién creado.
+    nombre_campo = datos.get("campo_nuevo_nombre", "").strip()
+    if nombre_campo:
+        campo, _ = CampoPersonalizado.objects.get_or_create(
+            nombre=nombre_campo[:190],
+            defaults={"tipo": datos.get("campo_nuevo_tipo", CampoPersonalizado.TEXTO)},
+        )
+        ValorCampo.objects.update_or_create(
+            documento=doc, campo=campo,
+            defaults={"valor": datos.get("campo_nuevo_valor", "").strip()},
+        )
+    elif datos.get("campo_anadir", "").isdigit():
+        campo = CampoPersonalizado.objects.filter(pk=int(datos["campo_anadir"])).first()
+        if campo:
+            ValorCampo.objects.update_or_create(
+                documento=doc, campo=campo,
+                defaults={"valor": datos.get("campo_nuevo_valor", "").strip()},
+            )
+
+    # Los campos que no venían en el formulario (los que no usa) no se tocan.
     for campo in CampoPersonalizado.objects.all():
         clave = f"campo_{campo.pk}"
         if clave not in datos:
@@ -351,7 +418,7 @@ def organizar(peticion):
         peticion,
         "biblioteca/organizar.html",
         {
-            "arbol": _arbol_etiquetas(),
+            "arbol": _arbol_etiquetas(peticion),
             "corresponsales": Corresponsal.objects.annotate(n=Count("documentos")),
             "tipos": TipoDocumento.objects.annotate(n=Count("documentos")),
             "campos": CampoPersonalizado.objects.all(),

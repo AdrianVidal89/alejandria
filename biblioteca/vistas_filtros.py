@@ -1,11 +1,19 @@
-"""Traduce los parámetros de la URL a un queryset. Lo comparten la lista,
-las acciones masivas y las búsquedas guardadas."""
+"""Filtrado por facetas.
+
+La idea, que es la de cualquier buscador con filtros que funcione bien: los
+filtros se combinan entre sí (Y), pero varios valores del MISMO filtro suman (O).
+Y lo importante — los recuentos de la barra lateral se calculan sobre el conjunto
+ya filtrado por todo lo demás, no sobre la biblioteca entera. Por eso existe el
+parámetro `excepto`: para contar cuántos documentos tendría cada corresponsal hay
+que aplicar todos los filtros menos el de corresponsales, o el propio filtro
+escondería las demás opciones.
+"""
 from urllib.parse import urlencode
 
-from django.db.models import Case, Count, IntegerField, Q, Value, When
+from django.db.models import Count, Q
 
 from . import busqueda
-from .models import Documento
+from .models import Documento, Etiqueta
 
 ORDENES = {
     "recientes": ("-anadido", "Añadidos primero"),
@@ -17,6 +25,8 @@ ORDENES = {
     "abierto": ("-abierto", "Vistos hace poco"),
 }
 
+FACETAS = ("etiqueta", "corresponsal", "tipo", "anio")
+
 
 def enteros(peticion, clave):
     valores = []
@@ -27,55 +37,46 @@ def enteros(peticion, clave):
     return valores
 
 
-def filtrar(peticion):
-    """Devuelve (queryset, contexto de filtros aplicados)."""
-    get = peticion.GET
-    qs = Documento.objects.con_relaciones()
+def seleccion(peticion):
+    return {clave: enteros(peticion, clave) for clave in FACETAS}
 
-    vista = get.get("vista", "")
-    if vista == "papelera":
-        qs = qs.filter(papelera=True)
-    else:
-        qs = qs.filter(papelera=False)
+
+def rama_de(ids_etiquetas):
+    """Amplía una lista de etiquetas con todas sus hijas."""
+    ampliadas = set()
+    for e in Etiqueta.objects.filter(pk__in=ids_etiquetas):
+        ampliadas |= e.descendientes_ids()
+    return ampliadas
+
+
+# --- Construcción del conjunto ------------------------------------------------
+def _ambito(qs, peticion):
+    """Colección elegida: todos, favoritos, sin clasificar, papelera, problemas."""
+    vista = peticion.GET.get("vista", "")
+    qs = qs.filter(papelera=(vista == "papelera"))
     if vista == "favoritos":
         qs = qs.filter(favorito=True)
     elif vista == "sin_clasificar":
         qs = qs.filter(etiquetas__isnull=True, corresponsal__isnull=True, tipo__isnull=True)
     elif vista == "problemas":
         qs = qs.exclude(estado=Documento.OK)
+    return qs
 
-    texto = get.get("q", "").strip()
-    ids_relevancia = None
-    if texto:
-        ids_relevancia = busqueda.ids_que_coinciden(texto)
-        if ids_relevancia is not None:
-            qs = qs.filter(pk__in=ids_relevancia)
 
-    etiquetas = enteros(peticion, "etiqueta")
-    if etiquetas:
-        from .models import Etiqueta
+def _texto(qs, peticion):
+    """Búsqueda libre. Devuelve (queryset, ids por relevancia o None)."""
+    texto = peticion.GET.get("q", "").strip()
+    if not texto:
+        return qs, None
+    ids = busqueda.ids_que_coinciden(texto)
+    if ids is None:
+        return qs, None
+    return qs.filter(pk__in=ids), ids
 
-        # Filtrar por una etiqueta incluye su rama de hijas (árbol DevonThink).
-        ampliadas = set()
-        for e in Etiqueta.objects.filter(pk__in=etiquetas):
-            ampliadas |= e.descendientes_ids()
-        modo = get.get("modo_etiquetas", "o")
-        if modo == "y" and len(etiquetas) > 1:
-            for uno in etiquetas:
-                qs = qs.filter(etiquetas__in=list(Etiqueta.objects.get(pk=uno).descendientes_ids()))
-        else:
-            qs = qs.filter(etiquetas__in=ampliadas)
-        qs = qs.distinct()
 
-    corresponsales = enteros(peticion, "corresponsal")
-    if corresponsales:
-        qs = qs.filter(corresponsal_id__in=corresponsales)
-    tipos = enteros(peticion, "tipo")
-    if tipos:
-        qs = qs.filter(tipo_id__in=tipos)
-    anios = enteros(peticion, "anio")
-    if anios:
-        qs = qs.filter(fecha__year__in=anios)
+def _otros(qs, peticion):
+    """Filtros que no son facetas de la barra lateral."""
+    get = peticion.GET
 
     extension = get.get("ext", "").strip().lower().lstrip(".")
     if extension:
@@ -85,20 +86,65 @@ def filtrar(peticion):
     if carpeta:
         qs = qs.filter(Q(ruta__startswith=f"{carpeta}/") | Q(ruta=carpeta))
 
-    desde, hasta = get.get("desde", ""), get.get("hasta", "")
-    if desde:
-        qs = qs.filter(fecha__gte=desde)
-    if hasta:
-        qs = qs.filter(fecha__lte=hasta)
+    if get.get("desde"):
+        qs = qs.filter(fecha__gte=get["desde"])
+    if get.get("hasta"):
+        qs = qs.filter(fecha__lte=get["hasta"])
 
-    campo = get.get("campo", "")
-    valor = get.get("valor", "").strip()
+    campo, valor = get.get("campo", ""), get.get("valor", "").strip()
     if campo.isdigit() and valor:
         qs = qs.filter(valores__campo_id=int(campo), valores__valor__icontains=valor)
+    return qs
+
+
+def _faceta(qs, clave, valores, peticion):
+    if not valores:
+        return qs
+    if clave == "etiqueta":
+        # Una llamada a filter() por etiqueta = se exigen TODAS (cada una con su
+        # rama). Ir pulsando etiquetas va estrechando la búsqueda, en vez de
+        # ampliarla, que es lo que se espera al navegar un archivo.
+        for uno in valores:
+            qs = qs.filter(etiquetas__in=rama_de([uno]))
+        return qs.distinct()
+    if clave == "corresponsal":
+        return qs.filter(corresponsal_id__in=valores)
+    if clave == "tipo":
+        return qs.filter(tipo_id__in=valores)
+    if clave == "anio":
+        return qs.filter(fecha__year__in=valores)
+    return qs
+
+
+def conjunto(peticion, excepto=()):
+    """Documentos que cumplen los filtros, saltándose las facetas de `excepto`."""
+    qs = Documento.objects.all()
+    if "vista" in excepto:
+        qs = qs.filter(papelera=False)
+    else:
+        qs = _ambito(qs, peticion)
+    qs, _ = _texto(qs, peticion)
+    qs = _otros(qs, peticion)
+    elegido = seleccion(peticion)
+    for clave in FACETAS:
+        if clave in excepto:
+            continue
+        qs = _faceta(qs, clave, elegido[clave], peticion)
+    return qs
+
+
+def filtrar(peticion):
+    """Conjunto final ya ordenado, más el resumen de filtros aplicados."""
+    get = peticion.GET
+    qs = conjunto(peticion).con_relaciones()
+
+    texto = get.get("q", "").strip()
+    ids_relevancia = busqueda.ids_que_coinciden(texto) if texto else None
 
     orden = get.get("orden", "recientes")
     if ids_relevancia and orden == "recientes":
-        # Buscando y sin orden explícito: manda la relevancia que da FTS5.
+        from django.db.models import Case, IntegerField, Value, When
+
         posicion = Case(
             *[When(pk=pk, then=Value(i)) for i, pk in enumerate(ids_relevancia)],
             default=Value(len(ids_relevancia)),
@@ -108,26 +154,81 @@ def filtrar(peticion):
     else:
         qs = qs.order_by(ORDENES.get(orden, ORDENES["recientes"])[0], "-id")
 
+    elegido = seleccion(peticion)
     return qs, {
         "q": texto,
-        "vista": vista,
+        "vista": get.get("vista", ""),
         "orden": orden,
-        "etiquetas_sel": etiquetas,
-        "corresponsales_sel": corresponsales,
-        "tipos_sel": tipos,
-        "anios_sel": anios,
-        "ext": extension,
-        "carpeta": carpeta,
-        "desde": desde,
-        "hasta": hasta,
-        "campo": campo,
-        "valor": valor,
-        "modo_etiquetas": get.get("modo_etiquetas", "o"),
+        "etiquetas_sel": elegido["etiqueta"],
+        "corresponsales_sel": elegido["corresponsal"],
+        "tipos_sel": elegido["tipo"],
+        "anios_sel": elegido["anio"],
+        "ext": get.get("ext", ""),
+        "carpeta": get.get("carpeta", "").strip("/"),
+        "desde": get.get("desde", ""),
+        "hasta": get.get("hasta", ""),
+        "campo": get.get("campo", ""),
+        "valor": get.get("valor", ""),
+        "hay_filtros": bool(
+            texto or get.get("vista") or get.get("ext") or get.get("carpeta")
+            or any(elegido.values())
+        ),
     }
 
 
+# --- Recuentos de la barra lateral --------------------------------------------
+def recuento_etiquetas(peticion):
+    """Documentos por etiqueta contando toda su rama y sin duplicar.
+
+    Se calcula sobre el conjunto ya filtrado —etiquetas puestas incluidas—, así
+    que cada número responde a «cuántos documentos me quedarían si además pulso
+    esta». Las que se quedan a cero desaparecen de la lista: es lo que mantiene
+    la barra lateral corta cuando hay muchas etiquetas.
+
+    El recorrido se hace en Python sobre los pares (documento, etiqueta) porque
+    un documento etiquetado a la vez con «Vehiculos» y «Vehiculos/Volvo» tiene
+    que contar una sola vez en la rama de «Vehiculos».
+    """
+    base = conjunto(peticion)
+    pares = (
+        Documento.etiquetas.through.objects
+        .filter(documento_id__in=base.values("pk"))
+        .values_list("etiqueta_id", "documento_id")
+    )
+    directos = {}
+    for etiqueta_id, documento_id in pares:
+        directos.setdefault(etiqueta_id, set()).add(documento_id)
+
+    etiquetas = list(Etiqueta.objects.all())
+    hijas = {}
+    for e in etiquetas:
+        hijas.setdefault(e.padre_id, []).append(e)
+
+    totales, propios = {}, {}
+
+    def recorrer(etiqueta):
+        acumulado = set(directos.get(etiqueta.pk, ()))
+        for hija in hijas.get(etiqueta.pk, []):
+            acumulado |= recorrer(hija)
+        totales[etiqueta.pk] = len(acumulado)
+        propios[etiqueta.pk] = len(directos.get(etiqueta.pk, ()))
+        return acumulado
+
+    for raiz in hijas.get(None, []):
+        recorrer(raiz)
+    return totales, propios
+
+
+def recuento_simple(peticion, faceta, campo):
+    # .order_by() sin argumentos es imprescindible: el orden por defecto del
+    # modelo se colaría en el GROUP BY y partiría cada recuento en varias filas.
+    base = conjunto(peticion, excepto={faceta}).order_by()
+    filas = base.values(campo).annotate(n=Count("id", distinct=True))
+    return {fila[campo]: fila["n"] for fila in filas if fila[campo] is not None}
+
+
+# --- Enlaces ------------------------------------------------------------------
 def consulta_actual(peticion, **cambios):
-    """Reconstruye la query string cambiando o quitando parámetros (valor None)."""
     datos = peticion.GET.copy()
     datos.pop("doc", None)
     datos.pop("pagina", None)
@@ -150,13 +251,3 @@ def alternar(lista, valor):
     else:
         lista.append(valor)
     return lista
-
-
-def facetas(qs_base):
-    """Contadores para la barra lateral, calculados sobre lo visible."""
-    return list(
-        qs_base.exclude(fecha=None)
-        .values("fecha__year")
-        .annotate(n=Count("id"))
-        .order_by("-fecha__year")
-    )

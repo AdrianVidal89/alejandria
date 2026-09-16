@@ -48,6 +48,27 @@
     });
   });
 
+  /* --- Barra lateral: filtrar listas largas y recordar secciones ------------- */
+  $$(".filtro-lista").forEach((caja) => {
+    const lista = $(caja.dataset.filtra);
+    if (!lista) return;
+    caja.addEventListener("input", () => {
+      const texto = caja.value.trim().toLowerCase();
+      $$("[data-nombre]", lista).forEach((fila) => {
+        fila.style.display = !texto || fila.dataset.nombre.includes(texto) ? "" : "none";
+      });
+    });
+  });
+
+  $$("details.grupo").forEach((seccion, i) => {
+    const clave = `alejandria-seccion-${seccion.id || i}`;
+    const guardado = localStorage.getItem(clave);
+    if (guardado !== null) seccion.open = guardado === "1";
+    seccion.addEventListener("toggle", () => {
+      localStorage.setItem(clave, seccion.open ? "1" : "0");
+    });
+  });
+
   /* --- Selección de documentos y panel de detalle --------------------------- */
   const contenedor = $("#documentos");
   const detalle = $("#detalle");
@@ -126,6 +147,25 @@
   function engancharFicha() {
     const ficha = $("#ficha-documento");
     if (!ficha) return;
+
+    // Añadir campo personalizado: se despliega el bloque, y elegir un campo que
+    // ya existe esconde los datos del campo nuevo (son dos caminos excluyentes).
+    const botonCampo = $("#boton-anadir-campo");
+    const bloqueCampo = $("#anadir-campo");
+    const selectorCampo = $("#selector-campo");
+    const campoNuevo = $("#campo-nuevo");
+    if (botonCampo && bloqueCampo) {
+      botonCampo.addEventListener("click", () => {
+        bloqueCampo.hidden = !bloqueCampo.hidden;
+        botonCampo.textContent = bloqueCampo.hidden ? "+ Añadir campo" : "− Cancelar";
+        if (!bloqueCampo.hidden && selectorCampo) selectorCampo.focus();
+      });
+    }
+    if (selectorCampo && campoNuevo) {
+      selectorCampo.addEventListener("change", () => {
+        campoNuevo.hidden = selectorCampo.value !== "";
+      });
+    }
     ficha.addEventListener("submit", (e) => {
       e.preventDefault();
       fetch(ficha.action, {
