@@ -84,6 +84,11 @@ class Command(BaseCommand):
             help="Carpeta de originales de paperless. Por defecto, la biblioteca de Alejandria.",
         )
         parser.add_argument(
+            "--sustituir-etiquetas", action="store_true",
+            help="Deja en cada documento SOLO las etiquetas de paperless. Por defecto se "
+                 "añaden a las que ya tuviera (por ejemplo, las sacadas de las carpetas).",
+        )
+        parser.add_argument(
             "--simular", action="store_true", help="Enseña lo que haría sin escribir nada."
         )
 
@@ -105,6 +110,7 @@ class Command(BaseCommand):
 
         con = sqlite3.connect(f"file:{base}?mode=ro&immutable=1", uri=True)
         con.row_factory = sqlite3.Row
+        self.sustituir = o["sustituir_etiquetas"]
         try:
             self.importar(con, originales, o["simular"])
         finally:
@@ -246,8 +252,12 @@ class Command(BaseCommand):
             doc.tipo = tipos.get(fila["document_type_id"])
         doc.save()
         marcadas = [etiquetas[t] for t in ids_etiquetas if t in etiquetas]
-        if marcadas:
+        if self.sustituir:
             doc.etiquetas.set(marcadas)
+        elif marcadas:
+            # Se añaden, no se reemplazan: las etiquetas que vengan de las
+            # carpetas del disco son información igual de válida y se perderían.
+            doc.etiquetas.add(*marcadas)
         busqueda.indexar(doc)
         return doc
 
