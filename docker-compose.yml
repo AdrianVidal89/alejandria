@@ -16,6 +16,11 @@ services:
     build: .
     container_name: alejandria-web
     restart: unless-stopped
+    # Correr como el usuario dueño de las carpetas, no como root: si no, los
+    # ficheros y carpetas que cree Alejandria dentro de la biblioteca aparecen
+    # como de root y dan problemas al tocarlos por carpeta compartida.
+    # En QTS el grupo del usuario NO se llama como él: es 1000:100 (adrian:everyone).
+    user: "${USUARIO:-1000:100}"
     env_file: .env
     environment:
       - ALEJANDRIA_VIGILANTE=0        # el vigilante va en su propio contenedor
@@ -42,6 +47,7 @@ services:
     build: .
     container_name: alejandria-vigilante
     restart: unless-stopped
+    user: "${USUARIO:-1000:100}"
     env_file: .env
     command: python manage.py vigilar
     volumes:
