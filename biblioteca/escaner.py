@@ -87,7 +87,23 @@ def _corresponsal(nombre):
     return obj
 
 
-def alta(ruta_rel, con_hash=True, adivinar=True):
+def etiquetas_de_ruta(ruta_rel):
+    """Convierte las carpetas de la ruta en un árbol de etiquetas.
+
+    Pensado para bibliotecas organizadas a mano (Compras/, Vehiculos/,
+    Documentacion Personal/…), donde la carpeta es una categoría, no el nombre de
+    quien manda el papel. Las carpetas de año se saltan: para eso está la fecha.
+    Devuelve la etiqueta más profunda, que ya cuelga de sus padres.
+    """
+    padre = None
+    for trozo in Path(ruta_rel).parts[:-1]:
+        if ANIO.match(trozo) or not trozo.strip():
+            continue
+        padre, _ = Etiqueta.objects.get_or_create(nombre=trozo.strip()[:128], padre=padre)
+    return padre
+
+
+def alta(ruta_rel, con_hash=True, adivinar=True, carpetas_como_etiquetas=False):
     """Da de alta un fichero ya presente en la biblioteca. Devuelve el Documento."""
     absoluta = Path(settings.BIBLIOTECA_DIR) / ruta_rel
     st = absoluta.stat()
@@ -110,6 +126,9 @@ def alta(ruta_rel, con_hash=True, adivinar=True):
             busqueda.indexar(gemelo)
             return gemelo
 
+    if carpetas_como_etiquetas:
+        corresponsal = None  # la carpeta es una categoría, no un remitente
+
     doc = Documento.objects.create(
         titulo=titulo[:300],
         ruta=ruta_rel,
@@ -120,11 +139,15 @@ def alta(ruta_rel, con_hash=True, adivinar=True):
         fecha=fecha,
         corresponsal=_corresponsal(corresponsal) if adivinar else None,
     )
+    if carpetas_como_etiquetas:
+        etiqueta = etiquetas_de_ruta(ruta_rel)
+        if etiqueta is not None:
+            doc.etiquetas.add(etiqueta)
     busqueda.indexar(doc)
     return doc
 
 
-def escanear(rehashear=False, adivinar=True, informar=None):
+def escanear(rehashear=False, adivinar=True, informar=None, carpetas_como_etiquetas=False):
     """Sincroniza la base con el contenido real de la carpeta.
 
     rehashear=False (lo normal) solo calcula el hash de ficheros nuevos o cuyo
@@ -140,7 +163,7 @@ def escanear(rehashear=False, adivinar=True, informar=None):
             informar(f"  {resumen['vistos']} ficheros recorridos…")
         doc_id = conocidos.get(ruta_rel)
         if doc_id is None:
-            alta(ruta_rel, adivinar=adivinar)
+            alta(ruta_rel, adivinar=adivinar, carpetas_como_etiquetas=carpetas_como_etiquetas)
             resumen["nuevos"] += 1
             continue
         vistos.add(doc_id)
