@@ -24,6 +24,10 @@ services:
       - ${BIBLIOTECA:?define BIBLIOTECA en .env}:/biblioteca
       - ${ENTRADA:?define ENTRADA en .env}:/entrada
       - ./datos:/datos
+      # Solo hace falta para importar de paperless (manage.py importar_paperless
+      # /paperless). Descomenta, levanta, importa y vuelve a comentarlo. El «ro»
+      # del final es solo-lectura: no puede modificar nada de paperless.
+      # - ${PAPERLESS:-/dev/null}:/paperless:ro
     mem_limit: 288m
     memswap_limit: 288m
     cpus: 1.5
