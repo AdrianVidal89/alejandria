@@ -3,11 +3,13 @@
 set -e
 cd /app
 
-python manage.py migrate --noinput
-python manage.py collectstatic --noinput --clear >/dev/null || {
-    echo "AVISO: no se pudieron copiar los estáticos. Suele ser permisos de la"
-    echo "carpeta datos/: comprueba que sea del mismo usuario que 'user:' en"
-    echo "docker-compose.yml (1000:100 en el NAS)."
+# Los estáticos ya vienen hechos dentro de la imagen (ver Dockerfile).
+python manage.py migrate --noinput || {
+    echo "ERROR: no se pudieron aplicar las migraciones."
+    echo "Casi siempre son permisos de la carpeta 'datos': tiene que pertenecer al"
+    echo "mismo usuario que la línea 'user:' del docker-compose.yml (1000:100 en el"
+    echo "NAS). Se arregla con:"
+    echo "  docker compose run --rm --user root web sh -c 'chown -R 1000:100 /datos'"
     exit 1
 }
 

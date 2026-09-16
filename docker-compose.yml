@@ -69,7 +69,6 @@ services:
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ${BIBLIOTECA:?}:/biblioteca:ro
-      - ./datos/estaticos:/estaticos:ro
     mem_limit: 24m
     depends_on:
       - web

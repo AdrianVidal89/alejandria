@@ -111,7 +111,11 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "estaticos/"
-STATIC_ROOT = DATOS_DIR / "estaticos"
+# Dentro de la imagen, no en los datos: los estáticos son parte del programa, no
+# información del usuario. Se generan durante la construcción y los sirve
+# whitenoise, así que el contenedor no necesita escribir en ninguna carpeta del
+# NAS para arrancar (era una fuente segura de fallos de permisos).
+STATIC_ROOT = Path(os.environ.get("ALEJANDRIA_ESTATICOS", BASE_DIR / "estaticos"))
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},

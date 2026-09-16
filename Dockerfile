@@ -19,6 +19,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Los estáticos se preparan aquí, en la construcción y como root: el contenedor
+# arranca después sin necesidad de escribir nada fuera de sus datos.
+RUN ALEJANDRIA_DATOS=/tmp/construccion python manage.py collectstatic --noinput --clear \
+    && rm -rf /tmp/construccion
+
 # UID 1000 / GID 100 = adrian:everyone en QTS (ver nota de infraestructura del NAS)
 RUN useradd -u 1000 -g 100 -M -d /app alejandria || true
 EXPOSE 8000
