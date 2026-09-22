@@ -30,8 +30,8 @@ from .models import (
     Registro, TipoDocumento, ValorCampo,
 )
 from .vistas_filtros import (
-    ORDENES, conjunto, consulta_actual, enteros, filtrar, recuento_etiquetas,
-    recuento_simple,
+    ORDENES, conjunto, consulta_actual, enteros, filtrar, modo_etiquetas,
+    recuento_etiquetas, recuento_simple,
 )
 
 log = logging.getLogger(__name__)
@@ -53,12 +53,16 @@ def acceso(vista):
 def _arbol_etiquetas(peticion):
     """Etiquetas en árbol con el recuento de documentos que quedan bajo cada una.
 
-    Se esconden las que no tienen ningún documento en el conjunto filtrado — que
-    es lo que evita el caos visual cuando hay muchas — salvo que estén
-    seleccionadas o que alguna hija suya siga siendo visible.
+    Se esconde una etiqueta solo si no alcanza a ningún documento del conjunto
+    —sin contar el propio filtro de etiquetas— que es lo que evita el caos
+    visual cuando hay muchas. Lo que NO se esconde es una etiqueta que
+    simplemente no se cruza con las ya elegidas: esa se marca como `sin_cruce`,
+    se pinta atenuada y se sigue pudiendo pulsar. Si desapareciera, sería
+    imposible cruzar dos etiquetas.
     """
-    totales, propios = recuento_etiquetas(peticion)
+    resultado, alcance, propios = recuento_etiquetas(peticion)
     elegidas = set(enteros(peticion, "etiqueta"))
+    exigir_todas = modo_etiquetas(peticion) == "y"
 
     etiquetas = list(Etiqueta.objects.all())
     hijas = {}
@@ -70,11 +74,13 @@ def _arbol_etiquetas(peticion):
         for e in sorted(hijas.get(padre_id, []), key=lambda x: x.nombre.lower()):
             debajo = rama(e.pk, nivel + 1)
             e.nivel = nivel
-            e.total = totales.get(e.pk, 0)
+            e.total = resultado.get(e.pk, 0)
+            e.alcance = alcance.get(e.pk, 0)
             e.propios = propios.get(e.pk, 0)
             e.elegida = e.pk in elegidas
+            e.sin_cruce = exigir_todas and not e.elegida and not e.total
             e.tiene_hijas = bool(hijas.get(e.pk))
-            if e.total or e.elegida or debajo:
+            if e.alcance or e.elegida or debajo:
                 salida.append(e)
                 salida.extend(debajo)
         return salida
@@ -123,6 +129,10 @@ def contexto_lateral(peticion):
         "campos": CampoPersonalizado.objects.all(),
         "totales": {
             "todos": ambito.count(),
+            # Este se cuenta sobre toda la biblioteca, no sobre lo filtrado: es
+            # un aviso de trabajo pendiente y tiene que decir la verdad aunque
+            # estés mirando otra cosa.
+            "por_revisar": Documento.objects.filter(papelera=False, por_revisar=True).count(),
             "favoritos": ambito.filter(favorito=True).count(),
             "sin_clasificar": ambito.filter(
                 etiquetas__isnull=True, corresponsal__isnull=True, tipo__isnull=True
@@ -266,7 +276,23 @@ def guardar(peticion, pk):
         etiquetas.append(etiqueta.pk)
     doc.etiquetas.set(etiquetas)
 
-    # Añadir un campo desde la ficha: o uno que ya existe, o uno recién creado.
+    # Catalogar es lo que saca un documento de «Recién llegados»: en cuanto
+    # tiene etiqueta, corresponsal o tipo deja de estar pendiente. El botón de
+    # la ficha manda por encima de eso, en los dos sentidos.
+    marca = datos.get("revisado", "")
+    if marca == "0":
+        pendiente = True
+    elif marca in ("1", "on", "true"):
+        pendiente = False
+    else:
+        pendiente = doc.por_revisar and not (
+            doc.corresponsal_id or doc.tipo_id or doc.etiquetas.exists()
+        )
+    if pendiente != doc.por_revisar:
+        doc.por_revisar = pendiente
+        doc.save(update_fields=["por_revisar"])
+
+    # Crear un campo que no existía en toda la biblioteca, desde la propia ficha.
     nombre_campo = datos.get("campo_nuevo_nombre", "").strip()
     if nombre_campo:
         campo, _ = CampoPersonalizado.objects.get_or_create(
@@ -277,21 +303,19 @@ def guardar(peticion, pk):
             documento=doc, campo=campo,
             defaults={"valor": datos.get("campo_nuevo_valor", "").strip()},
         )
-    elif datos.get("campo_anadir", "").isdigit():
-        campo = CampoPersonalizado.objects.filter(pk=int(datos["campo_anadir"])).first()
-        if campo:
-            ValorCampo.objects.update_or_create(
-                documento=doc, campo=campo,
-                defaults={"valor": datos.get("campo_nuevo_valor", "").strip()},
-            )
 
     # Los campos que no venían en el formulario (los que no usa) no se tocan.
+    # `campo_mantener` lo mandan las filas que están puestas en la ficha: esas
+    # se conservan aunque queden vacías, o añadir un campo hoy y rellenarlo
+    # mañana sería imposible. La × de la fila quita esa marca, y eso es lo que
+    # borra el campo de este documento.
+    mantener = {int(v) for v in datos.getlist("campo_mantener") if v.isdigit()}
     for campo in CampoPersonalizado.objects.all():
         clave = f"campo_{campo.pk}"
         if clave not in datos:
             continue
         valor = datos.get(clave, "").strip()
-        if valor:
+        if valor or campo.pk in mantener:
             ValorCampo.objects.update_or_create(
                 documento=doc, campo=campo, defaults={"valor": valor}
             )
@@ -333,6 +357,8 @@ def acciones(peticion):
         qs.update(papelera=False)
     elif accion == "favorito":
         qs.update(favorito=True)
+    elif accion == "revisado":
+        qs.update(por_revisar=False)
     elif accion == "borrar_definitivo":
         # Borra la ficha, NUNCA el fichero del disco.
         for doc in qs:
@@ -390,7 +416,7 @@ def miniatura(peticion, pk):
 @require_POST
 def subir(peticion):
     """Sube ficheros al buzón y los archiva en el momento."""
-    creados = []
+    creados, fallidos = [], 0
     entrada = Path(settings.ENTRADA_DIR)
     for subido in peticion.FILES.getlist("ficheros"):
         destino = entrada / escaner._limpio(subido.name, "documento")
@@ -404,10 +430,13 @@ def subir(peticion):
         try:
             creados.append(escaner.archivar(destino))
         except Exception as e:
+            fallidos += 1
             log.exception("No se pudo archivar %s", destino)
             Registro.anota(f"Error al subir {subido.name}: {e}", nivel="error")
     if peticion.headers.get("X-Parcial"):
-        return JsonResponse({"ok": True, "creados": [d.pk for d in creados]})
+        return JsonResponse(
+            {"ok": True, "creados": [d.pk for d in creados], "fallidos": fallidos}
+        )
     return redirect(reverse("biblioteca:biblioteca"))
 
 

@@ -235,6 +235,10 @@ def archivar(origen: Path, titulo=None, fecha=None, corresponsal=None, etiquetas
         doc.titulo = _limpio(titulo)[:300]
         doc.fecha = fecha
         doc.corresponsal = _corresponsal(corresponsal)
+        # Todo lo que entra por el buzón o por el botón de subir queda en
+        # cuarentena hasta que alguien lo cataloga: es la lista de «Recién
+        # llegados» de la barra lateral.
+        doc.por_revisar = True
         doc.save()
         etiquetas = list(etiquetas) or list(Etiqueta.objects.filter(inbox=True))
         if etiquetas:

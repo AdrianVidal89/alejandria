@@ -28,6 +28,32 @@
 
 {% block contenido %}{% endblock %}
 
+{# Subida: ventana propia con zona de soltar. Va dentro de un <dialog>, no
+   pegada al fondo de la página, que es lo que antes se quedaba tapando la
+   aplicación. Mientras está cerrada no intercepta absolutamente nada. #}
+<dialog id="dialogo-subida" class="modal">
+  <div class="cabecera-modal">
+    <h2>Subir documentos</h2>
+    <button type="button" class="btn icono" id="boton-cerrar-subida" aria-label="Cerrar">×</button>
+  </div>
+
+  <div class="zona-soltar" id="zona-soltar">
+    <p class="simbolo">📥</p>
+    <p><strong>Arrastra aquí los documentos</strong></p>
+    <p class="nada">— o —</p>
+    <button type="button" class="btn" id="boton-buscar-fichero">Buscar archivo…</button>
+    <p class="nada">Puedes soltar o elegir varios a la vez.</p>
+  </div>
+
+  <ul class="lista-subida" id="lista-subida"></ul>
+
+  <div class="pie-modal">
+    <span class="nada" id="estado-subida"></span>
+    <button type="button" class="btn" id="boton-vaciar-subida" hidden>Vaciar lista</button>
+    <button type="button" class="btn primario" id="boton-enviar-subida" disabled>Subir</button>
+  </div>
+</dialog>
+
 <form id="formulario-subida" action="{% url 'biblioteca:subir' %}" method="post"
       enctype="multipart/form-data" hidden>
   {% csrf_token %}

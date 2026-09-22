@@ -31,13 +31,14 @@ FACETAS = ("etiqueta", "corresponsal", "tipo", "anio")
 def modo_etiquetas(peticion):
     """Cómo se combinan varias etiquetas elegidas.
 
-    «y» (por defecto) = filtro doble: se exigen todas. Al elegir una, en la barra
-    lateral solo quedan las que conviven con ella en algún documento, así que
-    cada clic estrecha de verdad la búsqueda.
-    «o» = suman. Necesario cuando las etiquetas se excluyen entre sí, como las
-    que salen de las carpetas, donde exigir dos daría siempre cero.
+    «o» (por defecto) = suman: valen los documentos que tengan cualquiera de
+    ellas. Es lo único que funciona con etiquetas que salen de carpetas, que se
+    excluyen entre sí: exigirlas todas daría siempre cero y elegir la segunda no
+    serviría para nada.
+    «y» = filtro doble: se exigen todas. Tiene sentido con etiquetas
+    transversales (Urgente + Fiscal), donde cada clic estrecha de verdad.
     """
-    return "o" if peticion.GET.get("modo_etiquetas") == "o" else "y"
+    return "y" if peticion.GET.get("modo_etiquetas") == "y" else "o"
 
 
 def enteros(peticion, clave):
@@ -63,11 +64,14 @@ def rama_de(ids_etiquetas):
 
 # --- Construcción del conjunto ------------------------------------------------
 def _ambito(qs, peticion):
-    """Colección elegida: todos, favoritos, sin clasificar, papelera, problemas."""
+    """Colección elegida: todos, recién llegados, favoritos, sin clasificar, papelera…"""
     vista = peticion.GET.get("vista", "")
     qs = qs.filter(papelera=(vista == "papelera"))
     if vista == "favoritos":
         qs = qs.filter(favorito=True)
+    elif vista == "por_revisar":
+        # Lo que acaba de entrar y todavía no ha pasado por la ficha.
+        qs = qs.filter(por_revisar=True)
     elif vista == "sin_clasificar":
         qs = qs.filter(etiquetas__isnull=True, corresponsal__isnull=True, tipo__isnull=True)
     elif vista == "problemas":
@@ -195,24 +199,13 @@ def filtrar(peticion):
 
 
 # --- Recuentos de la barra lateral --------------------------------------------
-def recuento_etiquetas(peticion):
-    """Documentos por etiqueta contando toda su rama y sin duplicar.
-
-    Se calcula sobre el conjunto ya filtrado —etiquetas puestas incluidas—, así
-    que cada número responde a «cuántos documentos me quedarían si además pulso
-    esta». Las que se quedan a cero desaparecen de la lista: es lo que mantiene
-    la barra lateral corta cuando hay muchas etiquetas.
+def _cuenta_por_rama(base):
+    """Documentos de `base` bajo cada etiqueta, contando toda su rama.
 
     El recorrido se hace en Python sobre los pares (documento, etiqueta) porque
     un documento etiquetado a la vez con «Vehiculos» y «Vehiculos/Volvo» tiene
     que contar una sola vez en la rama de «Vehiculos».
     """
-    # Sumando (O), el recuento de cada etiqueta se calcula sin aplicar el filtro
-    # de etiquetas, o al elegir una las demás se irían a cero y no se podrían
-    # añadir. Exigiéndolas todas (Y) sí se aplica: cada número dice cuántos
-    # quedarían al añadir esa.
-    excepto = {"etiqueta"} if modo_etiquetas(peticion) == "o" else set()  # ver modo_etiquetas()
-    base = conjunto(peticion, excepto=excepto)
     pares = (
         Documento.etiquetas.through.objects
         .filter(documento_id__in=base.values("pk"))
@@ -222,9 +215,8 @@ def recuento_etiquetas(peticion):
     for etiqueta_id, documento_id in pares:
         directos.setdefault(etiqueta_id, set()).add(documento_id)
 
-    etiquetas = list(Etiqueta.objects.all())
     hijas = {}
-    for e in etiquetas:
+    for e in Etiqueta.objects.all():
         hijas.setdefault(e.padre_id, []).append(e)
 
     totales, propios = {}, {}
@@ -240,6 +232,27 @@ def recuento_etiquetas(peticion):
     for raiz in hijas.get(None, []):
         recorrer(raiz)
     return totales, propios
+
+
+def recuento_etiquetas(peticion):
+    """Dos recuentos por etiqueta: el que se enseña y el que decide si se enseña.
+
+    `resultado` = documentos que quedarían al pulsar esa etiqueta, con el modo
+    actual. Es el número que se pinta.
+
+    `alcance` = documentos que tienen esa etiqueta aplicando todos los demás
+    filtros pero NO el de etiquetas. Es lo que decide la visibilidad, y es la
+    razón de que existan los dos: contando solo el resultado, al elegir una
+    etiqueta todas las que no conviven con ella caían a cero, desaparecían de la
+    barra lateral y ya no se podía añadir una segunda. Con el alcance aparte, la
+    lista de etiquetas se mantiene estable y siempre se pueden cruzar varias.
+    """
+    alcance, propios = _cuenta_por_rama(conjunto(peticion, excepto={"etiqueta"}))
+    if modo_etiquetas(peticion) == "o" or not enteros(peticion, "etiqueta"):
+        # Sumando, o sin ninguna elegida todavía, ambos números coinciden.
+        return alcance, alcance, propios
+    resultado, _ = _cuenta_por_rama(conjunto(peticion))
+    return resultado, alcance, propios
 
 
 def recuento_simple(peticion, faceta, campo):

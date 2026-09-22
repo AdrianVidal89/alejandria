@@ -171,6 +171,10 @@ class Documento(models.Model):
     notas = models.TextField(blank=True)
     favorito = models.BooleanField(default=False)
     papelera = models.BooleanField(default=False)
+    por_revisar = models.BooleanField(
+        default=False, db_index=True, verbose_name="Recién llegado, sin catalogar",
+        help_text="Lo ponen el buzón y la subida; se quita al catalogarlo.",
+    )
     estado = models.CharField(max_length=10, choices=ESTADOS, default=OK)
     paperless_id = models.IntegerField(null=True, blank=True, unique=True)
 

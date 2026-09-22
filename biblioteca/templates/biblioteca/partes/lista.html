@@ -17,6 +17,18 @@
   </div>
 </div>
 
+{% if filtros.vista == 'por_revisar' and pagina.paginator.count %}
+  <p class="consejo">Estos {{ pagina.paginator.count }} acaban de entrar y nadie los ha catalogado.
+     Ponles etiqueta, corresponsal o tipo en la ficha de la derecha y se irán saliendo solos de aquí.</p>
+{% elif filtros.vista == 'por_revisar' %}
+  <p class="consejo">Nada pendiente: todo lo que has subido está catalogado.</p>
+{% endif %}
+
+{% if not pagina.paginator.count and filtros.modo_etiquetas == 'y' and filtros.etiquetas_sel|length > 1 %}
+  <p class="consejo">Ningún documento tiene a la vez todas las etiquetas elegidas.
+     <a class="btn mini" href="?{% consulta modo_etiquetas=None %}">Buscar cualquiera de ellas</a></p>
+{% endif %}
+
 <div class="acciones-seleccion" id="acciones-seleccion" hidden>
   <form method="post" action="{% url 'biblioteca:acciones' %}" id="form-acciones">
     {% csrf_token %}
@@ -38,6 +50,9 @@
       <button class="btn peligro" name="accion" value="borrar_definitivo"
               onclick="return confirm('Quita la ficha de Alejandria. El fichero del disco NO se toca. ¿Seguir?')">Quitar ficha</button>
     {% else %}
+      {% if filtros.vista == 'por_revisar' %}
+        <button class="btn" name="accion" value="revisado">Marcar catalogados</button>
+      {% endif %}
       <button class="btn" name="accion" value="papelera">A la papelera</button>
     {% endif %}
   </form>

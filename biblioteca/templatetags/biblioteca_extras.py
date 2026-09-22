@@ -1,3 +1,5 @@
+import json
+
 from django import template
 from django.utils.safestring import mark_safe
 
@@ -30,6 +32,12 @@ def quitar_filtro(context, clave, valor=None):
         return mark_safe(consulta_actual(peticion, **{clave: None}))
     restantes = [v for v in enteros(peticion, clave) if v != int(valor)]
     return mark_safe(consulta_actual(peticion, **{clave: restantes or None}))
+
+
+@registrar.filter
+def como_json(valor):
+    """JSON para meterlo en un atributo data-. Sin mark_safe: lo escapa Django."""
+    return json.dumps(valor, ensure_ascii=False)
 
 
 @registrar.filter

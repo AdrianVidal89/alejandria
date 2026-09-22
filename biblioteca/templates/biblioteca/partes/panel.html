@@ -10,6 +10,14 @@
   </div>
 </div>
 
+{% if doc.por_revisar %}
+  <div class="pendiente" id="aviso-pendiente">
+    <span>📥 Recién llegado · sin catalogar</span>
+    <button type="button" class="btn mini" id="boton-catalogado"
+            title="Sácalo de «Recién llegados» sin tocar nada más">Ya está</button>
+  </div>
+{% endif %}
+
 {% if not doc.existe %}
   <p class="alerta">⚠ El fichero no está en la carpeta. Se movió o se borró desde fuera de Alejandria.</p>
 {% endif %}
@@ -30,6 +38,7 @@
 
 <form class="ficha" method="post" action="{% url 'biblioteca:guardar' doc.pk %}" id="ficha-documento">
   {% csrf_token %}
+  <input type="hidden" name="revisado" id="marca-revisado" value="">
   <label>Título
     <input type="text" name="titulo" value="{{ doc.titulo }}">
   </label>
@@ -77,46 +86,67 @@
     <input type="text" name="etiquetas_nuevas" placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
   </fieldset>
 
+  {# Campos personalizados: elegir uno o varios los pinta en el acto, sin pasar
+     por Guardar. Lo que se guarda al enviar la ficha es su valor. #}
   <fieldset class="campos">
     <legend>Campos personalizados</legend>
-    {% for v in campos_usados %}
-      <label class="campo">{{ v.campo.nombre }}
-        {% if v.campo.tipo == 'booleano' %}
-          <select name="campo_{{ v.campo.pk }}">
-            <option value="">—</option>
-            <option value="1" {% if v.valor == '1' %}selected{% endif %}>Sí</option>
-            <option value="0" {% if v.valor == '0' %}selected{% endif %}>No</option>
-          </select>
-        {% elif v.campo.tipo == 'seleccion' %}
-          <select name="campo_{{ v.campo.pk }}">
-            <option value="">—</option>
-            {% for o in v.campo.opciones %}
-              <option value="{{ o }}" {% if v.valor == o %}selected{% endif %}>{{ o }}</option>
-            {% endfor %}
-          </select>
-        {% else %}
-          <input type="{% if v.campo.tipo == 'fecha' %}date{% elif v.campo.tipo == 'numero' or v.campo.tipo == 'moneda' %}number{% elif v.campo.tipo == 'url' %}url{% else %}text{% endif %}"
-                 {% if v.campo.tipo == 'moneda' %}step="0.01"{% endif %}
-                 name="campo_{{ v.campo.pk }}" value="{{ v.valor }}">
-        {% endif %}
-        <small class="pista">Vacíalo para quitar el campo de este documento.</small>
-      </label>
-    {% empty %}
-      <p class="nada">Ninguno todavía.</p>
-    {% endfor %}
 
-    <button type="button" class="btn mini" id="boton-anadir-campo">+ Añadir campo</button>
+    <div class="campos-lista" id="campos-lista">
+      {% for v in campos_usados %}
+        <div class="campo-fila" data-campo="{{ v.campo.pk }}">
+          <label class="campo">{{ v.campo.nombre }}
+            {% if v.campo.tipo == 'booleano' %}
+              <select name="campo_{{ v.campo.pk }}">
+                <option value="">—</option>
+                <option value="1" {% if v.valor == '1' %}selected{% endif %}>Sí</option>
+                <option value="0" {% if v.valor == '0' %}selected{% endif %}>No</option>
+              </select>
+            {% elif v.campo.tipo == 'seleccion' %}
+              <select name="campo_{{ v.campo.pk }}">
+                <option value="">—</option>
+                {% for o in v.campo.opciones %}
+                  <option value="{{ o }}" {% if v.valor == o %}selected{% endif %}>{{ o }}</option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <input type="{% if v.campo.tipo == 'fecha' %}date{% elif v.campo.tipo == 'numero' or v.campo.tipo == 'moneda' %}number{% elif v.campo.tipo == 'url' %}url{% else %}text{% endif %}"
+                     {% if v.campo.tipo == 'moneda' %}step="0.01"{% endif %}
+                     name="campo_{{ v.campo.pk }}" value="{{ v.valor }}">
+            {% endif %}
+          </label>
+          <input type="hidden" name="campo_mantener" value="{{ v.campo.pk }}">
+          <button type="button" class="quitar-campo" title="Quitar este campo del documento">×</button>
+        </div>
+      {% endfor %}
+    </div>
+    <p class="nada" id="campos-vacio" {% if campos_usados %}hidden{% endif %}>Ninguno todavía.</p>
+
+    <button type="button" class="btn mini" id="boton-anadir-campo">+ Seleccionar y añadir</button>
 
     <div id="anadir-campo" hidden>
-      <label>Campo
-        <select name="campo_anadir" id="selector-campo">
-          <option value="">— crear uno nuevo —</option>
+      {% if campos_disponibles %}
+        <input type="search" id="filtro-campos" class="filtro-campos" autocomplete="off"
+               placeholder="Buscar campo…">
+        <div class="campos-elegibles" id="campos-elegibles">
           {% for c in campos_disponibles %}
-            <option value="{{ c.pk }}">{{ c.nombre }}</option>
+            <label class="campo-elegible" data-nombre="{{ c.nombre|lower }}">
+              <input type="checkbox" class="chk-campo" value="{{ c.pk }}"
+                     data-nombre="{{ c.nombre }}" data-tipo="{{ c.tipo }}"
+                     data-opciones="{{ c.opciones|como_json }}">
+              <span>{{ c.nombre }}</span><em>{{ c.get_tipo_display }}</em>
+            </label>
           {% endfor %}
-        </select>
-      </label>
-      <div id="campo-nuevo">
+        </div>
+        <div class="botonera-campos">
+          <button type="button" class="btn mini primario" id="boton-confirmar-campos">Añadir</button>
+          <button type="button" class="btn mini" id="boton-campo-nuevo">Crear uno nuevo…</button>
+        </div>
+      {% else %}
+        <p class="nada">Todos los campos de la biblioteca ya están en esta ficha.</p>
+        <button type="button" class="btn mini" id="boton-campo-nuevo">Crear uno nuevo…</button>
+      {% endif %}
+
+      <div id="campo-nuevo" hidden>
         <label>Nombre del campo nuevo
           <input type="text" name="campo_nuevo_nombre" placeholder="Importe, Vencimiento, Garantía…">
         </label>
@@ -125,10 +155,10 @@
             {% for clave, etiqueta in tipos_campo %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}
           </select>
         </label>
+        <label>Valor
+          <input type="text" name="campo_nuevo_valor" placeholder="Se guarda al pulsar Guardar">
+        </label>
       </div>
-      <label>Valor
-        <input type="text" name="campo_nuevo_valor" placeholder="Se guarda al pulsar Guardar">
-      </label>
     </div>
   </fieldset>
 
