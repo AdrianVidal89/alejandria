@@ -149,8 +149,6 @@ input, select, textarea, button { font: inherit; color: inherit; }
 
 /* Una etiqueta que no se cruza con las ya elegidas no se esconde: se atenúa.
    Esconderla era lo que impedía cruzar dos etiquetas. */
-.fila-lateral.sin-cruce { opacity: .45; }
-.fila-lateral.sin-cruce:hover { opacity: 1; }
 
 /* Recién llegados: la única fila de la barra lateral con número de aviso. */
 .fila-lateral.recien .insignia {

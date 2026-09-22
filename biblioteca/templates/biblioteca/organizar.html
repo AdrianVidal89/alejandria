@@ -8,14 +8,33 @@
      estos elementos <strong>no borra documentos</strong>: solo deja de estar asignado.</p>
 
   <section class="bloque" id="etiquetas">
-    <h2>Etiquetas</h2>
+    <h2>Etiquetas <small class="nada">{{ arbol|length }} en total{% if etiquetas_sin_usar %},
+        {{ etiquetas_sin_usar }} sin usar{% endif %}</small></h2>
+    {% if etiquetas_sin_usar %}
+      <p class="nada">Las marcadas como <span class="etq">sin usar</span> no están en ningún
+         documento, ni suyo ni de sus hijas: se pueden borrar sin pensarlo. Las que dicen
+         <em>solo agrupa</em> no están puestas en nada, pero sostienen a las de debajo: si las
+         borras, sus hijas se quedan sueltas en la raíz. El número de las demás lleva a sus
+         documentos, por si quieres ver qué hay dentro antes de decidir.</p>
+    {% endif %}
     <table class="tabla-simple">
       <tbody>
       {% for e in arbol %}
         <tr>
           <td style="padding-left:{{ e.nivel }}0px"><i class="punto" style="background:{{ e.color }}"></i> {{ e.nombre }}
             {% if e.inbox %}<span class="etq">buzón</span>{% endif %}</td>
-          <td class="derecha">{{ e.n }} doc.</td>
+          <td class="derecha">
+            {% if e.propios %}
+              <a href="{% url 'biblioteca:biblioteca' %}?etiqueta={{ e.pk }}">{{ e.propios }} doc.</a>
+              {% if e.alcance > e.propios %}
+                <small class="nada">{{ e.alcance }} con sus hijas</small>
+              {% endif %}
+            {% elif e.alcance %}
+              <small class="nada">solo agrupa · {{ e.alcance }} en sus hijas</small>
+            {% else %}
+              <span class="etq">sin usar</span>
+            {% endif %}
+          </td>
           <td class="derecha">
             <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" onsubmit="return confirm('¿Borrar la etiqueta {{ e.nombre|escapejs }}?')">
               {% csrf_token %}<input type="hidden" name="que" value="etiqueta">

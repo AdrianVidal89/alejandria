@@ -71,10 +71,10 @@
   {% endif %}
   <div class="lista-facetas" id="lista-etiquetas">
     {% for e in arbol %}
-      <a class="fila-lateral faceta {% if e.elegida %}activa{% endif %} {% if e.sin_cruce %}sin-cruce{% endif %}"
+      <a class="fila-lateral faceta {% if e.elegida %}activa{% endif %}"
          style="padding-left:{{ e.nivel|sangria }}px"
          href="?{% alterna_consulta 'etiqueta' e.pk %}" data-nombre="{{ e.nombre|lower }}"
-         {% if e.sin_cruce %}title="Ningún documento tiene esta etiqueta junto con las ya elegidas. Con «cualquiera» sumarías sus {{ e.alcance }}."{% endif %}>
+         {% if e.sin_cruce %}title="Solo se queda porque cuelgan etiquetas de ella: no se cruza con las elegidas."{% endif %}>
         <span><i class="punto" style="background:{{ e.color }}"></i>{{ e.nombre }}</span>
         <em>{{ e.total }}</em>
       </a>

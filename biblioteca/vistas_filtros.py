@@ -197,7 +197,7 @@ def filtrar(peticion):
 
 
 # --- Recuentos de la barra lateral --------------------------------------------
-def _cuenta_por_rama(base):
+def cuenta_por_rama(base):
     """Documentos de `base` bajo cada etiqueta, contando toda su rama.
 
     El recorrido se hace en Python sobre los pares (documento, etiqueta) porque
@@ -245,11 +245,11 @@ def recuento_etiquetas(peticion):
     barra lateral y ya no se podía añadir una segunda. Con el alcance aparte, la
     lista de etiquetas se mantiene estable y siempre se pueden cruzar varias.
     """
-    alcance, propios = _cuenta_por_rama(conjunto(peticion, excepto={"etiqueta"}))
+    alcance, propios = cuenta_por_rama(conjunto(peticion, excepto={"etiqueta"}))
     if modo_etiquetas(peticion) == "o" or not enteros(peticion, "etiqueta"):
         # Sumando, o sin ninguna elegida todavía, ambos números coinciden.
         return alcance, alcance, propios
-    resultado, _ = _cuenta_por_rama(conjunto(peticion))
+    resultado, _ = cuenta_por_rama(conjunto(peticion))
     return resultado, alcance, propios
 
 

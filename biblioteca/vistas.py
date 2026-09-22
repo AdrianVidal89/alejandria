@@ -30,8 +30,8 @@ from .models import (
     Registro, TipoDocumento, ValorCampo,
 )
 from .vistas_filtros import (
-    ORDENES, conjunto, consulta_actual, enteros, filtrar, modo_etiquetas,
-    recuento_etiquetas, recuento_simple,
+    ORDENES, conjunto, consulta_actual, cuenta_por_rama, enteros, filtrar,
+    modo_etiquetas, recuento_etiquetas, recuento_simple,
 )
 
 log = logging.getLogger(__name__)
@@ -53,12 +53,15 @@ def acceso(vista):
 def _arbol_etiquetas(peticion):
     """Etiquetas en árbol con el recuento de documentos que quedan bajo cada una.
 
-    Se esconde una etiqueta solo si no alcanza a ningún documento del conjunto
-    —sin contar el propio filtro de etiquetas— que es lo que evita el caos
-    visual cuando hay muchas. Lo que NO se esconde es una etiqueta que
-    simplemente no se cruza con las ya elegidas: esa se marca como `sin_cruce`,
-    se pinta atenuada y se sigue pudiendo pulsar. Si desapareciera, sería
-    imposible cruzar dos etiquetas.
+    Se esconde una etiqueta si no alcanza a ningún documento del conjunto —sin
+    contar el propio filtro de etiquetas— y también si no se cruza con las ya
+    elegidas (`sin_cruce`). Esta segunda antes se pintaba atenuada en vez de
+    desaparecer, para poder cruzarla igualmente; la lista se ensuciaba con
+    etiquetas que no llevaban a ninguna parte, así que ahora se va. Con el modo
+    «cualquiera» no se esconde nada por este motivo: ahí se suman, no se cruzan.
+
+    Una etiqueta con descendencia visible se queda aunque ella misma no cruce:
+    si se fuera, sus hijas colgarían de la nada.
     """
     resultado, alcance, propios = recuento_etiquetas(peticion)
     elegidas = set(enteros(peticion, "etiqueta"))
@@ -80,9 +83,40 @@ def _arbol_etiquetas(peticion):
             e.elegida = e.pk in elegidas
             e.sin_cruce = exigir_todas and not e.elegida and not e.total
             e.tiene_hijas = bool(hijas.get(e.pk))
-            if e.alcance or e.elegida or debajo:
+            if e.elegida or debajo or (e.alcance and not e.sin_cruce):
                 salida.append(e)
                 salida.extend(debajo)
+        return salida
+
+    return rama(None)
+
+
+def _arbol_completo():
+    """Todas las etiquetas en árbol, también las que no usa ningún documento.
+
+    El árbol de la barra lateral esconde las etiquetas vacías, que es lo que se
+    quiere mientras filtras. En Organizar sobran justo las contrarias: se viene
+    aquí a ver qué hay de más, y una etiqueta que no usa nadie es la primera
+    candidata a borrar. Si no se lista, no hay forma de quitarla.
+
+    `propios` son los documentos que llevan puesta esa etiqueta; `alcance`
+    cuenta además los de sus hijas, sin repetir los que llevan las dos.
+    """
+    alcance, propios = cuenta_por_rama(Documento.objects.visibles())
+
+    hijas = {}
+    for e in Etiqueta.objects.all():
+        hijas.setdefault(e.padre_id, []).append(e)
+
+    def rama(padre_id, nivel=0):
+        salida = []
+        for e in sorted(hijas.get(padre_id, []), key=lambda x: x.nombre.lower()):
+            e.nivel = nivel
+            e.propios = propios.get(e.pk, 0)
+            e.alcance = alcance.get(e.pk, 0)
+            e.tiene_hijas = bool(hijas.get(e.pk))
+            salida.append(e)
+            salida.extend(rama(e.pk, nivel + 1))
         return salida
 
     return rama(None)
@@ -443,11 +477,15 @@ def subir(peticion):
 # --- Organizar ----------------------------------------------------------------
 @acceso
 def organizar(peticion):
+    arbol = _arbol_completo()
     return render(
         peticion,
         "biblioteca/organizar.html",
         {
-            "arbol": _arbol_etiquetas(peticion),
+            "arbol": arbol,
+            # Sin usar de verdad: ni en documentos propios ni en los de sus hijas.
+            # Una que solo agrupa no cuenta aquí; borrarla dejaría sueltas a las hijas.
+            "etiquetas_sin_usar": sum(1 for e in arbol if not e.alcance),
             "corresponsales": Corresponsal.objects.annotate(n=Count("documentos")),
             "tipos": TipoDocumento.objects.annotate(n=Count("documentos")),
             "campos": CampoPersonalizado.objects.all(),
