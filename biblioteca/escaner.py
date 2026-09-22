@@ -103,6 +103,33 @@ def etiquetas_de_ruta(ruta_rel):
     return padre
 
 
+def _mismo_fichero_movido(ruta_rel, digest, nombre, tamano):
+    """La ficha de un fichero que se ha movido a mano, si es que la hay.
+
+    Primero por huella, que es lo fiable. Y si no aparece, por nombre y tamaño
+    exactos entre los que se han quedado sin fichero: un documento dado de alta
+    sin huella —pasaba con lo que entraba por el buzón— no se reconocía al
+    moverlo, y el escaneo creaba una ficha nueva vacía al lado de la buena.
+    """
+    if digest:
+        gemelo = (
+            Documento.objects.filter(hash=digest)
+            .exclude(ruta=ruta_rel)
+            .order_by("estado")
+            .first()
+        )
+        if gemelo is not None and not gemelo.ruta_absoluta.is_file():
+            return gemelo
+
+    candidatos = [
+        d for d in Documento.objects.filter(bytes=tamano).exclude(ruta=ruta_rel)
+        if Path(d.ruta).name == nombre and not d.ruta_absoluta.is_file()
+    ]
+    # Solo si no hay duda: con dos ficheros iguales en sitios distintos no se
+    # puede saber cuál es, y equivocarse aquí mezcla dos documentos.
+    return candidatos[0] if len(candidatos) == 1 else None
+
+
 def alta(ruta_rel, con_hash=True, adivinar=True, carpetas_como_etiquetas=False):
     """Da de alta un fichero ya presente en la biblioteca. Devuelve el Documento."""
     absoluta = Path(settings.BIBLIOTECA_DIR) / ruta_rel
@@ -110,21 +137,17 @@ def alta(ruta_rel, con_hash=True, adivinar=True, carpetas_como_etiquetas=False):
     titulo, fecha, corresponsal = deducir(ruta_rel) if adivinar else (absoluta.stem, None, None)
     digest = sha256(absoluta) if con_hash else ""
 
-    if digest:
-        # ¿Es un fichero que ya conocíamos y simplemente ha cambiado de sitio?
-        gemelo = (
-            Documento.objects.filter(hash=digest)
-            .exclude(ruta=ruta_rel)
-            .order_by("estado")
-            .first()
-        )
-        if gemelo and not gemelo.ruta_absoluta.is_file():
-            gemelo.ruta = ruta_rel
-            gemelo.estado = Documento.OK
-            gemelo.bytes, gemelo.mtime = st.st_size, st.st_mtime
-            gemelo.save()
-            busqueda.indexar(gemelo)
-            return gemelo
+    gemelo = _mismo_fichero_movido(ruta_rel, digest, absoluta.name, st.st_size)
+    if gemelo is not None:
+        gemelo.ruta = ruta_rel
+        gemelo.estado = Documento.OK
+        gemelo.bytes, gemelo.mtime = st.st_size, st.st_mtime
+        if digest and not gemelo.hash:
+            gemelo.hash = digest      # se quedó sin huella; se repara de paso
+        gemelo.save()
+        busqueda.indexar(gemelo)
+        gemelo.reenganchado = True   # para que el resumen no lo cuente como nuevo
+        return gemelo
 
     if carpetas_como_etiquetas:
         corresponsal = None  # la carpeta es una categoría, no un remitente
@@ -153,7 +176,7 @@ def escanear(rehashear=False, adivinar=True, informar=None, carpetas_como_etique
     rehashear=False (lo normal) solo calcula el hash de ficheros nuevos o cuyo
     tamaño/fecha haya cambiado: recorrer 20.000 papeles cuesta segundos, no minutos.
     """
-    resumen = {"nuevos": 0, "actualizados": 0, "ausentes": 0, "vistos": 0}
+    resumen = {"nuevos": 0, "movidos": 0, "actualizados": 0, "ausentes": 0, "vistos": 0}
     conocidos = dict(Documento.objects.values_list("ruta", "id"))
     vistos = set()
 
@@ -163,8 +186,15 @@ def escanear(rehashear=False, adivinar=True, informar=None, carpetas_como_etique
             informar(f"  {resumen['vistos']} ficheros recorridos…")
         doc_id = conocidos.get(ruta_rel)
         if doc_id is None:
-            alta(ruta_rel, adivinar=adivinar, carpetas_como_etiquetas=carpetas_como_etiquetas)
-            resumen["nuevos"] += 1
+            doc = alta(ruta_rel, adivinar=adivinar,
+                       carpetas_como_etiquetas=carpetas_como_etiquetas)
+            # Un fichero que solo ha cambiado de carpeta no es un documento nuevo:
+            # es el mismo de siempre, y decir «nuevo» asusta sin motivo.
+            if getattr(doc, "reenganchado", False):
+                resumen["movidos"] += 1
+                vistos.add(doc.pk)
+            else:
+                resumen["nuevos"] += 1
             continue
         vistos.add(doc_id)
         doc = Documento.objects.get(pk=doc_id)
@@ -282,3 +312,79 @@ def procesar_entrada(memoria=None):
             log.exception("Error archivando %s", hijo)
             Registro.anota(f"Error archivando {hijo.name}: {e}", nivel="error")
     return creados
+
+
+# --- Cambiar un documento de carpeta ------------------------------------------
+def carpeta_segura(carpeta_rel):
+    """Ruta absoluta de una carpeta de la biblioteca, a prueba de `../`.
+
+    Se limpia segmento a segmento con las mismas reglas que el archivado, así que
+    lo que escriba el usuario en el cuadro de mover no puede salir de la
+    biblioteca ni colar caracteres que rompan el sistema de ficheros.
+    """
+    base = Path(settings.BIBLIOTECA_DIR).resolve()
+    partes = [
+        _limpio(p, "")
+        for p in str(carpeta_rel or "").replace("\\", "/").split("/")
+    ]
+    partes = [p for p in partes if p and p not in (".", "..")]
+    destino = base.joinpath(*partes).resolve() if partes else base
+    if destino != base and base not in destino.parents:
+        raise ValueError("La carpeta queda fuera de la biblioteca")
+    return destino
+
+
+def mover(doc, carpeta_rel):
+    """Mueve el fichero de un documento a otra carpeta de la biblioteca.
+
+    Es lo que en paperless hacía la «carpeta contenedora». Mueve el fichero de
+    verdad y actualiza la ficha; el hash no cambia, así que ni se recalcula ni se
+    pierde nada de lo que tenga puesto.
+    """
+    origen = doc.ruta_absoluta
+    if not origen.is_file():
+        raise FileNotFoundError(doc.ruta)
+
+    carpeta = carpeta_segura(carpeta_rel)
+    carpeta.mkdir(parents=True, exist_ok=True)
+    destino = carpeta / origen.name
+    if destino == origen:
+        return doc.ruta
+
+    # Si ya hay uno con ese nombre en el destino, se numera en vez de pisarlo.
+    contador = 1
+    while destino.exists():
+        contador += 1
+        destino = carpeta / f"{origen.stem} ({contador}){origen.suffix}"
+
+    origen.replace(destino) if origen.parent == destino.parent else _mueve(origen, destino)
+    base = Path(settings.BIBLIOTECA_DIR).resolve()
+    doc.ruta = str(destino.resolve().relative_to(base))
+    doc.refrescar_desde_disco(rehashear=False)
+    doc.save(update_fields=["ruta", "bytes", "mtime", "estado", "mime"])
+    busqueda.indexar(doc)   # la ruta entra en el índice: hay que reindexar
+
+    # La carpeta de origen se queda vacía muy a menudo al vaciar el buzón.
+    try:
+        if origen.parent != base and not any(origen.parent.iterdir()):
+            origen.parent.rmdir()
+    except OSError:
+        pass
+    return doc.ruta
+
+
+def _mueve(origen: Path, destino: Path):
+    """Mover entre carpetas, aguantando que sean sistemas de ficheros distintos."""
+    import shutil
+    shutil.move(str(origen), str(destino))
+
+
+def carpetas():
+    """Todas las carpetas de la biblioteca, en relativo y ordenadas."""
+    base = Path(settings.BIBLIOTECA_DIR)
+    salida = set()
+    for raiz, subcarpetas, _ in os.walk(base):
+        subcarpetas[:] = [s for s in subcarpetas if not s.startswith((".", "@"))]
+        for s in subcarpetas:
+            salida.add(str(Path(raiz, s).relative_to(base)))
+    return sorted(salida, key=str.lower)

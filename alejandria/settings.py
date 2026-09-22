@@ -160,6 +160,13 @@ VIGILANTE_INTERVALO = int(os.environ.get("ALEJANDRIA_VIGILANTE_INTERVALO", "30")
 # Patrón de archivado de lo que entra por el buzón, relativo a BIBLIOTECA_DIR.
 PATRON_ARCHIVADO = os.environ.get("ALEJANDRIA_PATRON", "{anio}/{corresponsal}/{titulo}{ext}")
 
+# Si el patrón empieza por una carpeta fija —«Bandeja de entrada/{titulo}{ext}»—,
+# todo lo que llega por el buzón se acumula ahí hasta que alguien lo coloca. Ese
+# nombre es el que usa el atajo «Bandeja de entrada» de la barra lateral. Con el
+# patrón clásico por años no hay carpeta fija y el atajo no se enseña.
+_cabeza_patron = PATRON_ARCHIVADO.split("{")[0]
+CARPETA_BUZON = _cabeza_patron.strip("/") if "/" in _cabeza_patron else ""
+
 # Servir ficheros delegando en nginx (X-Accel-Redirect): Django no lee el PDF.
 ACCEL_PREFIJO = os.environ.get("ALEJANDRIA_ACCEL", "")
 

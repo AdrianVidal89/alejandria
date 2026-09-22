@@ -26,7 +26,7 @@
       <label class="interruptor"><input type="checkbox" name="rehashear" value="1"> Recalcular huellas de todo (más lento)</label>
     </form>
     {% if escaneo.resumen %}
-      <p class="resultado">Último escaneo: {{ escaneo.resumen.nuevos }} nuevos ·
+      <p class="resultado">Último escaneo: {{ escaneo.resumen.nuevos }} nuevos · {{ escaneo.resumen.movidos }} movidos ·
         {{ escaneo.resumen.actualizados }} actualizados · {{ escaneo.resumen.ausentes }} ausentes ·
         {{ escaneo.resumen.vistos }} ficheros recorridos.</p>
     {% endif %}

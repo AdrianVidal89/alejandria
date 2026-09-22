@@ -6,6 +6,9 @@ framework de JavaScript, ni compilación, ni un solo megabyte de node_modules.
 """
 import datetime as dt
 import logging
+import os
+import tempfile
+import zipfile
 import mimetypes
 import threading
 from pathlib import Path
@@ -161,6 +164,7 @@ def contexto_lateral(peticion):
         "anios": anios,
         "guardadas": BusquedaGuardada.objects.all(),
         "campos": CampoPersonalizado.objects.all(),
+        "carpetas": escaner.carpetas(),
         "totales": {
             "todos": ambito.count(),
             # Este se cuenta sobre toda la biblioteca, no sobre lo filtrado: es
@@ -173,7 +177,17 @@ def contexto_lateral(peticion):
             ).count(),
             "problemas": ambito.exclude(estado=Documento.OK).count(),
             "papelera": Documento.objects.filter(papelera=True).count(),
+            # Lo que sigue físicamente en la carpeta del buzón. No es lo mismo
+            # que «Recién llegados»: eso se apaga en cuanto catalogas, pero el
+            # fichero se queda ahí hasta que lo mueves a su carpeta.
+            "en_buzon": (
+                Documento.objects.filter(
+                    papelera=False, ruta__startswith=f"{settings.CARPETA_BUZON}/"
+                ).count()
+                if settings.CARPETA_BUZON else 0
+            ),
         },
+        "carpeta_buzon": settings.CARPETA_BUZON,
         "activos": _filtros_activos(peticion),
     }
 
@@ -254,6 +268,7 @@ def _contexto_documento(doc):
         "campos_usados": usados,
         "campos_disponibles": CampoPersonalizado.objects.exclude(pk__in=ids_usados),
         "tipos_campo": CampoPersonalizado.TIPOS,
+        "carpetas": escaner.carpetas(),
         "etiquetas_todas": Etiqueta.objects.all(),
         "corresponsales_todos": Corresponsal.objects.all(),
         "tipos_todos": TipoDocumento.objects.all(),
@@ -364,6 +379,93 @@ def guardar(peticion, pk):
 
 @acceso
 @require_POST
+def mover(peticion, pk):
+    """Cambia un documento de carpeta: la «carpeta contenedora» de paperless.
+
+    Mueve el fichero de verdad dentro de la biblioteca. El hash no cambia, así
+    que la ficha se conserva entera: etiquetas, campos, notas y fecha.
+    """
+    doc = get_object_or_404(Documento, pk=pk)
+    destino = peticion.POST.get("carpeta", "")
+    try:
+        escaner.mover(doc, destino)
+    except FileNotFoundError:
+        return HttpResponseBadRequest("El fichero no está en la carpeta")
+    except (ValueError, OSError) as e:
+        return HttpResponseBadRequest(f"No se ha podido mover: {e}")
+    if peticion.headers.get("X-Parcial"):
+        return JsonResponse({"ok": True, "ruta": doc.ruta})
+    return redirect(peticion.POST.get("volver") or doc.get_absolute_url())
+
+
+@acceso
+@require_POST
+def descargar_varios(peticion):
+    """Un zip con los documentos seleccionados, nombrados por su título.
+
+    Se arma en un fichero temporal, no en memoria: el NAS tiene 3,7 GB y aquí
+    puede caer una selección de cientos de PDF. Compresión al mínimo, porque un
+    PDF ya viene comprimido y lo único que se ganaría es calentar la CPU.
+    """
+    ids = [int(v) for v in peticion.POST.getlist("ids") if v.isdigit()]
+    docs = [d for d in Documento.objects.filter(pk__in=ids) if d.existe]
+    if not docs:
+        return HttpResponseBadRequest("No hay documentos que descargar")
+
+    temporal = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    usados = set()
+    try:
+        with zipfile.ZipFile(temporal, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
+            for doc in docs:
+                ruta = doc.ruta_absoluta
+                nombre = f"{escaner._limpio(doc.titulo)}{ruta.suffix}"
+                raiz, extension = os.path.splitext(nombre)
+                contador = 1
+                while nombre.lower() in usados:
+                    contador += 1
+                    nombre = f"{raiz} ({contador}){extension}"
+                usados.add(nombre.lower())
+                z.write(ruta, arcname=nombre)
+        temporal.close()
+    except Exception:
+        temporal.close()
+        os.unlink(temporal.name)
+        raise
+
+    marca = timezone.localdate().isoformat()
+    respuesta = FileResponse(
+        _TemporalQueSeBorra(temporal.name),
+        as_attachment=True,
+        filename=f"alejandria-{marca}.zip",
+        content_type="application/zip",
+    )
+    respuesta["Content-Length"] = os.path.getsize(temporal.name)
+    return respuesta
+
+
+class _TemporalQueSeBorra:
+    """Fichero que se borra solo cuando la respuesta termina de enviarse."""
+
+    def __init__(self, ruta):
+        self.ruta = ruta
+        self._f = open(ruta, "rb")
+
+    def read(self, *a):
+        return self._f.read(*a)
+
+    def __iter__(self):
+        return iter(lambda: self._f.read(65536), b"")
+
+    def close(self):
+        self._f.close()
+        try:
+            os.unlink(self.ruta)
+        except OSError:
+            pass
+
+
+@acceso
+@require_POST
 def acciones(peticion):
     """Acciones sobre varios documentos a la vez (la selección de la lista)."""
     ids = [int(v) for v in peticion.POST.getlist("ids") if v.isdigit()]
@@ -385,6 +487,16 @@ def acciones(peticion):
     elif accion == "tipo":
         valor = peticion.POST.get("tipo", "")
         qs.update(tipo_id=int(valor) if valor.isdigit() else None)
+    elif accion == "mover":
+        destino = peticion.POST.get("carpeta", "")
+        movidos = 0
+        for doc in qs:
+            try:
+                escaner.mover(doc, destino)
+                movidos += 1
+            except (FileNotFoundError, ValueError, OSError) as e:
+                log.warning("No se pudo mover %s: %s", doc.pk, e)
+        afectados = movidos
     elif accion == "papelera":
         qs.update(papelera=True)
     elif accion == "restaurar":
@@ -619,7 +731,7 @@ def escanear_ahora(peticion):
             resumen = escaner.escanear(rehashear=rehashear)
             _escaneo["resumen"] = resumen
             Registro.anota(
-                "Escaneo: {nuevos} nuevos, {actualizados} actualizados, "
+                "Escaneo: {nuevos} nuevos, {movidos} movidos, {actualizados} actualizados, "
                 "{ausentes} ausentes, {vistos} ficheros".format(**resumen)
             )
         except Exception as e:

@@ -2,7 +2,27 @@
 <div class="detalle-cabecera">
   <div>
     <h2 id="titulo-detalle">{{ doc.titulo }}</h2>
-    <p class="ruta-detalle" title="{{ doc.ruta }}">{{ doc.ruta }}</p>
+    <p class="ruta-detalle" title="{{ doc.ruta }}">{{ doc.ruta }}
+      <button type="button" class="btn mini" id="boton-mover"
+              title="Llevar el fichero a otra carpeta de la biblioteca">Mover…</button>
+    </p>
+    <form method="post" action="{% url 'biblioteca:mover' doc.pk %}" id="formulario-mover" hidden>
+      {% csrf_token %}
+      <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+      <label>A qué carpeta
+        <input type="text" name="carpeta" list="carpetas-biblioteca" value="{{ doc.carpeta }}"
+               placeholder="Vacío = la raíz de la biblioteca" autocomplete="off">
+      </label>
+      <div class="linea">
+        <button class="btn primario mini">Mover</button>
+        <button type="button" class="btn mini" id="boton-mover-cancelar">Cancelar</button>
+      </div>
+      <p class="nada">Se mueve el fichero de verdad. La ficha no se toca: conserva
+         etiquetas, campos, notas y fecha.</p>
+    </form>
+    <datalist id="carpetas-biblioteca">
+      {% for c in carpetas %}<option value="{{ c }}">{% endfor %}
+    </datalist>
   </div>
   <div class="detalle-botones">
     <a class="btn" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">Abrir</a>

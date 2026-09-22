@@ -389,6 +389,31 @@
       });
     });
   }
+  // Descargar la selección en un zip: mismo formulario, otro destino.
+  const botonZip = $("#boton-descargar-varios");
+  if (botonZip && formAcciones) {
+    botonZip.addEventListener("click", () => {
+      const ids = seleccionados();
+      if (!ids.length) return;
+      const envio = document.createElement("form");
+      envio.method = "post";
+      envio.action = botonZip.dataset.url || "/descargar-varios/";
+      envio.style.display = "none";
+      const csrf = formAcciones.querySelector('[name="csrfmiddlewaretoken"]');
+      if (csrf) envio.appendChild(csrf.cloneNode());
+      ids.forEach((id) => {
+        const oculto = document.createElement("input");
+        oculto.type = "hidden";
+        oculto.name = "ids";
+        oculto.value = id;
+        envio.appendChild(oculto);
+      });
+      document.body.appendChild(envio);
+      envio.submit();
+      envio.remove();
+    });
+  }
+
   refrescarSeleccion();
 
   /* --- Subir documentos ------------------------------------------------------ */
@@ -549,3 +574,16 @@
     peticion.send(datos);
   }
 })();
+
+/* --- Mover un documento de carpeta ------------------------------------------ */
+/* El formulario vive plegado en la ficha; se engancha cada vez que el panel se
+   recarga, igual que el resto de controles del detalle. */
+document.addEventListener("click", (e) => {
+  const abrir = e.target.closest("#boton-mover");
+  const cerrar = e.target.closest("#boton-mover-cancelar");
+  if (!abrir && !cerrar) return;
+  const formulario = document.querySelector("#formulario-mover");
+  if (!formulario) return;
+  formulario.hidden = !abrir;
+  if (abrir) formulario.querySelector('[name="carpeta"]').focus();
+});

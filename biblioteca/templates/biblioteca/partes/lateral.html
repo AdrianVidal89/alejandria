@@ -29,6 +29,17 @@
      title="Lo que ha entrado por el buzón o por el botón de subir y aún no has catalogado">
     <span>📥 Recién llegados</span><em class="insignia">{{ totales.por_revisar }}</em></a>
   {% endif %}
+  {% if totales.en_buzon %}
+  {% comment %}
+  Distinto de «Recién llegados»: aquel se apaga en cuanto catalogas el documento,
+  pero el fichero sigue en la carpeta del buzón hasta que lo mueves a su sitio.
+  Esto es la lista de lo que queda por colocar.
+  {% endcomment %}
+  <a class="fila-lateral {% if filtros.carpeta == carpeta_buzon %}activa{% endif %}"
+     href="{% url 'biblioteca:biblioteca' %}?carpeta={{ carpeta_buzon|urlencode }}"
+     title="Ficheros que siguen en la carpeta de entrada, sin colocar en su carpeta">
+    <span>📦 Sin colocar</span><em class="insignia">{{ totales.en_buzon }}</em></a>
+  {% endif %}
   <a class="fila-lateral {% if filtros.vista == 'favoritos' %}activa{% endif %}" href="?{% consulta vista='favoritos' %}">
     <span>Favoritos</span><em>{{ totales.favoritos }}</em></a>
   <a class="fila-lateral {% if filtros.vista == 'sin_clasificar' %}activa{% endif %}" href="?{% consulta vista='sin_clasificar' %}">

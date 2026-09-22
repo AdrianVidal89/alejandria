@@ -32,7 +32,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             self.style.SUCCESS(
-                "Listo: {nuevos} nuevos, {actualizados} actualizados, "
+                "Listo: {nuevos} nuevos, {movidos} movidos, {actualizados} actualizados, "
                 "{ausentes} ausentes, {vistos} ficheros recorridos.".format(**resumen)
             )
         )

@@ -45,6 +45,15 @@
       {% for c in corresponsales %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
     </select>
     <button class="btn" name="accion" value="corresponsal">Asignar</button>
+    <input type="text" name="carpeta" list="carpetas-lista" placeholder="carpeta destino"
+           autocomplete="off" size="16">
+    <datalist id="carpetas-lista">
+      {% for c in carpetas %}<option value="{{ c }}">{% endfor %}
+    </datalist>
+    <button class="btn" name="accion" value="mover"
+            title="Lleva los ficheros a esa carpeta de la biblioteca">Mover</button>
+    <button class="btn" type="button" id="boton-descargar-varios" data-url="{% url 'biblioteca:descargar_varios' %}"
+            title="Un zip con los documentos seleccionados">⬇ Descargar</button>
     {% if filtros.vista == 'papelera' %}
       <button class="btn" name="accion" value="restaurar">Restaurar</button>
       <button class="btn peligro" name="accion" value="borrar_definitivo"
