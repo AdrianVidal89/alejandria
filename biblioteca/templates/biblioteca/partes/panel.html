@@ -86,8 +86,10 @@
     <input type="text" name="etiquetas_nuevas" placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
   </fieldset>
 
-  {# Campos personalizados: elegir uno o varios los pinta en el acto, sin pasar
-     por Guardar. Lo que se guarda al enviar la ficha es su valor. #}
+  {% comment %}
+  Campos personalizados: elegir uno o varios los pinta en el acto, sin pasar por
+  Guardar. Lo que se guarda al enviar la ficha es su valor.
+  {% endcomment %}
   <fieldset class="campos">
     <legend>Campos personalizados</legend>
 

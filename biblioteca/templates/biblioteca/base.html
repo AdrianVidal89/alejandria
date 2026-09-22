@@ -28,9 +28,11 @@
 
 {% block contenido %}{% endblock %}
 
-{# Subida: ventana propia con zona de soltar. Va dentro de un <dialog>, no
-   pegada al fondo de la página, que es lo que antes se quedaba tapando la
-   aplicación. Mientras está cerrada no intercepta absolutamente nada. #}
+{% comment %}
+Subida: ventana propia con zona de soltar. Va dentro de un <dialog>, no pegada
+al fondo de la página, que es lo que antes se quedaba tapando la aplicación.
+Mientras está cerrada no intercepta absolutamente nada.
+{% endcomment %}
 <dialog id="dialogo-subida" class="modal">
   <div class="cabecera-modal">
     <h2>Subir documentos</h2>

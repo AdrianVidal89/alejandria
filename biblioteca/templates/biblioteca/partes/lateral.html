@@ -20,8 +20,10 @@
      href="?{% consulta vista=None %}">
     <span>Todos</span><em>{{ totales.todos }}</em></a>
   {% if totales.por_revisar or filtros.vista == 'por_revisar' %}
-  {# Enlace limpio a propósito: es el «acabo de subir esto, enséñamelo», y con
-     los filtros de antes puestos podría no enseñar nada. #}
+  {% comment %}
+  Enlace limpio a propósito: es el «acabo de subir esto, enséñamelo», y con los
+  filtros de antes puestos podría no enseñar nada.
+  {% endcomment %}
   <a class="fila-lateral recien {% if filtros.vista == 'por_revisar' %}activa{% endif %}"
      href="{% url 'biblioteca:biblioteca' %}?vista=por_revisar"
      title="Lo que ha entrado por el buzón o por el botón de subir y aún no has catalogado">
@@ -50,8 +52,10 @@
 
 <details class="grupo" open id="grupo-etiquetas">
   <summary><h3>Etiquetas <a class="mini" href="{% url 'biblioteca:organizar' %}#etiquetas">editar</a></h3></summary>
-  {# El interruptor va siempre a la vista, no solo cuando ya hay una elegida:
-     así se sabe de antemano qué va a pasar al pulsar la segunda. #}
+  {% comment %}
+  El interruptor va siempre a la vista, no solo cuando ya hay una elegida: así se
+  sabe de antemano qué va a pasar al pulsar la segunda.
+  {% endcomment %}
   <div class="modo-etiquetas">
     <span>Que tengan</span>
     <a class="{% if filtros.modo_etiquetas == 'o' %}activo{% endif %}"

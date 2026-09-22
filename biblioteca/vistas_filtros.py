@@ -8,8 +8,6 @@ parámetro `excepto`: para contar cuántos documentos tendría cada corresponsal
 que aplicar todos los filtros menos el de corresponsales, o el propio filtro
 escondería las demás opciones.
 """
-from urllib.parse import urlencode
-
 from django.db.models import Count, Q
 
 from . import busqueda
@@ -277,7 +275,11 @@ def consulta_actual(peticion, **cambios):
                 datos.appendlist(clave, str(v))
         else:
             datos[clave] = str(valor)
-    return urlencode(datos, doseq=True)
+    # El urlencode() del QueryDict y no el de urllib: el de urllib recorre
+    # .items(), que de un diccionario de varios valores solo devuelve el último.
+    # Por eso los enlaces de la barra lateral sustituían la etiqueta anterior en
+    # vez de añadirla, y nunca se podía filtrar por dos a la vez.
+    return datos.urlencode()
 
 
 def alternar(lista, valor):
