@@ -3,18 +3,21 @@
 {% block cuerpo %}vista-biblioteca{% endblock %}
 
 {% block contenido %}
-<main class="tres-paneles" id="marco">
-  <aside class="panel lateral" id="lateral">
-    {% include "biblioteca/partes/lateral.html" %}
-  </aside>
+{% comment %}
+Dos paneles y una barra de filtros encima. Los filtros eran una tercera columna
+que se comía 250 px de ancho a todas horas; ahora son desplegables y el ancho
+se lo reparten la lista y la vista previa.
+{% endcomment %}
+<nav class="barra-filtros" id="barra-filtros">
+  {% include "biblioteca/partes/filtros.html" %}
+</nav>
 
-  <div class="tirador" data-tira="lateral"></div>
-
+<main class="dos-paneles" id="marco">
   <section class="panel central" id="central">
     {% include "biblioteca/partes/lista.html" %}
   </section>
 
-  <div class="tirador" data-tira="detalle"></div>
+  <div class="tirador" data-tira="detalle" title="Arrastra para cambiar el ancho"></div>
 
   <aside class="panel detalle" id="detalle">
     {% if actual %}{% include "biblioteca/partes/panel.html" %}

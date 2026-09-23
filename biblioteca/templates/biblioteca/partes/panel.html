@@ -1,65 +1,105 @@
 {% load biblioteca_extras %}
-<div class="detalle-cabecera">
-  <div>
-    <h2 id="titulo-detalle">{{ doc.titulo }}</h2>
-    <p class="ruta-detalle" title="{{ doc.ruta }}">{{ doc.ruta }}
-      <button type="button" class="btn mini" id="boton-mover"
-              title="Llevar el fichero a otra carpeta de la biblioteca">Mover…</button>
-    </p>
-    <form method="post" action="{% url 'biblioteca:mover' doc.pk %}" id="formulario-mover" hidden>
-      {% csrf_token %}
-      <input type="hidden" name="volver" value="{{ request.get_full_path }}">
-      <label>A qué carpeta
-        <input type="text" name="carpeta" list="carpetas-biblioteca" value="{{ doc.carpeta }}"
-               placeholder="Vacío = la raíz de la biblioteca" autocomplete="off">
-      </label>
-      <div class="linea">
-        <button class="btn primario mini">Mover</button>
-        <button type="button" class="btn mini" id="boton-mover-cancelar">Cancelar</button>
-      </div>
-      <p class="nada">Se mueve el fichero de verdad. La ficha no se toca: conserva
-         etiquetas, campos, notas y fecha.</p>
-    </form>
-    <datalist id="carpetas-biblioteca">
-      {% for c in carpetas %}<option value="{{ c }}">{% endfor %}
-    </datalist>
-  </div>
-  <div class="detalle-botones">
-    <a class="btn" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">Abrir</a>
-    <a class="btn" href="{% url 'biblioteca:descargar' doc.pk %}">Descargar</a>
-  </div>
-</div>
-
-{% if doc.por_revisar %}
-  <div class="pendiente" id="aviso-pendiente">
-    <span>📥 Recién llegado · sin catalogar</span>
-    <button type="button" class="btn mini" id="boton-catalogado"
-            title="Sácalo de «Recién llegados» sin tocar nada más">Ya está</button>
-  </div>
-{% endif %}
-
-{% if not doc.existe %}
-  <p class="alerta">⚠ El fichero no está en la carpeta. Se movió o se borró desde fuera de Alejandria.</p>
-{% endif %}
-
-<div class="previsualizacion">
-  {% if doc.es_pdf and doc.existe %}
-    <iframe src="{% url 'biblioteca:fichero' doc.pk %}#view=FitH&toolbar=0" title="Vista previa" loading="lazy"></iframe>
-  {% elif doc.es_imagen and doc.existe %}
-    <img src="{% url 'biblioteca:fichero' doc.pk %}" alt="{{ doc.titulo }}">
-  {% elif doc.existe %}
-    <div class="sin-vista">
-      <img src="{% url 'biblioteca:miniatura' doc.pk %}" alt="" class="miniatura-grande">
-      <p>{{ doc.icono }} {{ doc.extension|upper }} · {{ doc.tamano_legible }}</p>
-      <p class="nada">Sin vista previa para este formato. Ábrelo con «Abrir».</p>
+{% comment %}
+El panel va en tres partes (data-parte). Al guardar la ficha solo se cambian la
+cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
+{% endcomment %}
+<div data-parte="cabecera">
+  <div class="detalle-cabecera">
+    <div class="detalle-titulos">
+      <h2 id="titulo-detalle" title="{{ doc.titulo }}">{{ doc.titulo }}</h2>
+      <p class="ruta-detalle" title="{{ doc.ruta }}">{{ doc.ruta }}</p>
     </div>
+    <button type="button" class="boton-estrella {% if doc.favorito %}puesta{% endif %}" id="boton-estrella"
+            title="{% if doc.favorito %}Quitar de favoritos{% else %}Marcar como favorito{% endif %}"
+            aria-pressed="{% if doc.favorito %}true{% else %}false{% endif %}">
+      <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3l-5.5 2.9 1-6.2L3 9.6l6.2-.9z"/></svg>
+    </button>
+  </div>
+
+  <div class="detalle-botones">
+    <a class="btn" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+      Abrir</a>
+    <a class="btn" href="{% url 'biblioteca:descargar' doc.pk %}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+      Descargar</a>
+    <button type="button" class="btn estrecho" id="boton-mover"
+            title="Llevar el fichero a otra carpeta de la biblioteca">Mover…</button>
+  </div>
+
+  <form method="post" action="{% url 'biblioteca:mover' doc.pk %}" id="formulario-mover" class="formulario-mover" hidden>
+    {% csrf_token %}
+    <input type="hidden" name="volver" value="{{ request.get_full_path }}">
+    <label>A qué carpeta
+      <input type="text" name="carpeta" list="carpetas-biblioteca" value="{{ doc.carpeta }}"
+             placeholder="Vacío = la raíz de la biblioteca" autocomplete="off">
+    </label>
+    <div class="linea">
+      <button class="btn primario mini">Mover</button>
+      <button type="button" class="btn mini" id="boton-mover-cancelar">Cancelar</button>
+    </div>
+    <p class="nada">Se mueve el fichero de verdad. La ficha no se toca: conserva
+       etiquetas, campos, notas y fecha.</p>
+  </form>
+  <datalist id="carpetas-biblioteca">
+    {% for c in carpetas %}<option value="{{ c }}">{% endfor %}
+  </datalist>
+
+  {% if doc.por_revisar %}
+    <div class="pendiente" id="aviso-pendiente">
+      <span>📥 Recién llegado · sin catalogar</span>
+      <button type="button" class="btn mini" id="boton-catalogado"
+              title="Sácalo de «Recién llegados» sin tocar nada más">Ya está</button>
+    </div>
+  {% endif %}
+
+  {% if not doc.existe %}
+    <p class="alerta">⚠ El fichero no está en la carpeta. Se movió o se borró desde fuera de Alejandria.</p>
   {% endif %}
 </div>
 
+<section class="bloque-vista" data-parte="vista">
+  <div class="cabecera-seccion">
+    <p class="titulo-vista">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      Vista previa
+      {% if doc.es_word %}<span class="nada">· Word convertido</span>{% elif doc.es_markdown %}<span class="nada">· Markdown</span>{% endif %}
+    </p>
+    <span class="insignia-formato">{{ doc.extension|upper|default:"?" }} · {{ doc.tamano_legible }}</span>
+  </div>
+  <div class="previsualizacion {% if doc.es_imagen %}imagen{% endif %}">
+    {% if doc.es_pdf and doc.existe %}
+      <iframe src="{% url 'biblioteca:fichero' doc.pk %}#view=FitH&toolbar=0" title="Vista previa" loading="lazy"></iframe>
+    {% elif doc.es_imagen and doc.existe %}
+      <img src="{% url 'biblioteca:fichero' doc.pk %}" alt="{{ doc.titulo }}">
+    {% elif doc.vista_convertida and doc.existe %}
+      <iframe src="{% url 'biblioteca:vista' doc.pk %}" title="Vista previa" loading="lazy"
+              sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+    {% elif doc.existe %}
+      <div class="sin-vista">
+        <img src="{% url 'biblioteca:miniatura' doc.pk %}" alt="" class="miniatura-grande">
+        <p><span class="formato f-{{ doc.familia }}">{{ doc.formato_corto }}</span> {{ doc.tamano_legible }}</p>
+        <p class="nada">Sin vista previa para este formato. Ábrelo con «Abrir».</p>
+      </div>
+    {% else %}
+      <div class="sin-vista"><p class="nada">No hay fichero que enseñar.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="bloque-ficha" data-parte="ficha">
+<div class="cabecera-seccion">
+  <h3 class="titulo-seccion">Metadatos del documento</h3>
+  <span class="estado-ficha" id="estado-ficha" data-estado="limpio">
+    <span class="si-limpio">✓ Al día</span>
+    <span class="si-sucio">● Cambios sin guardar</span>
+    <span class="si-guardado">✓ Guardado</span>
+  </span>
+</div>
 <form class="ficha" method="post" action="{% url 'biblioteca:guardar' doc.pk %}" id="ficha-documento">
   {% csrf_token %}
   <input type="hidden" name="revisado" id="marca-revisado" value="">
-  <label>Título
+  <label>Título del documento
     <input type="text" name="titulo" value="{{ doc.titulo }}">
   </label>
 
@@ -67,9 +107,12 @@
     <label>Fecha del documento
       <input type="date" name="fecha" value="{{ doc.fecha|date:'Y-m-d' }}">
     </label>
-    <label class="interruptor">
-      <input type="checkbox" name="favorito" value="1" {% if doc.favorito %}checked{% endif %}> Favorito ★
-    </label>
+    <div class="campo-caja">
+      <span class="rotulo">Destacado</span>
+      <label class="interruptor caja">
+        <input type="checkbox" name="favorito" value="1" id="casilla-favorito" {% if doc.favorito %}checked{% endif %}> Favorito ★
+      </label>
+    </div>
   </div>
 
   <label>Corresponsal
@@ -92,19 +135,34 @@
     <input type="text" name="tipo_nuevo" placeholder="…o escribe uno nuevo" class="anadir">
   </label>
 
-  <fieldset class="etiquetas-ficha">
-    <legend>Etiquetas</legend>
-    <div class="nube">
-      {% for e in etiquetas_todas %}
-        <label class="etq-check">
-          <input type="checkbox" name="etiquetas" value="{{ e.pk }}"
-                 {% if e in doc.etiquetas.all %}checked{% endif %}>
-          <span style="--c:{{ e.color }}">{{ e.nombre }}</span>
-        </label>
-      {% endfor %}
+  <div class="etiquetas-ficha">
+    <div class="rotulo-linea">
+      <span class="rotulo">Etiquetas asignadas</span>
+      <button type="button" class="enlace" id="boton-nueva-etiqueta">+ Nueva etiqueta</button>
     </div>
-    <input type="text" name="etiquetas_nuevas" placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
-  </fieldset>
+    <div class="nube asignadas">
+      {% for e in etiquetas_todas %}{% if e.pk in etiquetas_doc %}
+        <label class="etq-check">
+          <input type="checkbox" name="etiquetas" value="{{ e.pk }}" checked>
+          <span style="--c:{{ e.color }}" title="Pulsa para quitarla">{{ e.nombre }}<i class="aspa" aria-hidden="true">×</i></span>
+        </label>
+      {% endif %}{% empty %}<p class="nada">No hay etiquetas en la biblioteca.</p>{% endfor %}
+      {% if etiquetas_todas and not etiquetas_doc %}<span class="nada sin-asignar">Ninguna todavía: elige abajo o crea una nueva.</span>{% endif %}
+    </div>
+    <input type="text" name="etiquetas_nuevas" id="etiquetas-nuevas" hidden
+           placeholder="Nuevas etiquetas, separadas por comas" class="anadir">
+    {% if etiquetas_todas|length > etiquetas_doc|length %}
+      <p class="rotulo sugerencias">Añadir etiqueta:</p>
+      <div class="nube disponibles">
+        {% for e in etiquetas_todas %}{% if e.pk not in etiquetas_doc %}
+          <label class="etq-check">
+            <input type="checkbox" name="etiquetas" value="{{ e.pk }}">
+            <span style="--c:{{ e.color }}">{{ e.nombre }}<i class="aspa" aria-hidden="true">×</i></span>
+          </label>
+        {% endif %}{% endfor %}
+      </div>
+    {% endif %}
+  </div>
 
   {% comment %}
   Campos personalizados: elegir uno o varios los pinta en el acto, sin pasar por
@@ -189,8 +247,8 @@
   </label>
 
   <div class="pie-ficha">
-    <button class="btn primario" type="submit">Guardar</button>
-    <span class="guardado" id="aviso-guardado" hidden>Guardado ✓</span>
+    <button class="btn primario" type="submit">Guardar cambios</button>
+    <span class="nada atajo"><kbd>Ctrl</kbd> + <kbd>S</kbd></span>
   </div>
 
   <dl class="tecnico">
@@ -201,3 +259,4 @@
     {% if doc.paperless_id %}<dt>Paperless</dt><dd>#{{ doc.paperless_id }}</dd>{% endif %}
   </dl>
 </form>
+</section>

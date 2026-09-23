@@ -232,8 +232,44 @@ class Documento(models.Model):
         return self.extension in ("txt", "md", "csv", "log", "json", "xml", "yml", "yaml")
 
     @property
+    def es_word(self):
+        return self.extension == "docx"
+
+    @property
+    def es_markdown(self):
+        return self.extension in ("md", "markdown")
+
+    @property
+    def vista_convertida(self):
+        """Se enseña traducido a HTML por el servidor (Word, Markdown, texto)."""
+        return self.es_word or self.es_texto or self.es_markdown
+
+    @property
     def previsualizable(self):
-        return self.es_pdf or self.es_imagen or self.es_texto
+        return self.es_pdf or self.es_imagen or self.vista_convertida
+
+    @property
+    def formato_corto(self):
+        """Lo que se pinta en la insignia de formato de la lista."""
+        return (self.extension or "?")[:4].upper()
+
+    @property
+    def familia(self):
+        """Familia de formato, para el color de la insignia."""
+        ext = self.extension
+        if ext == "pdf":
+            return "pdf"
+        if ext in ("doc", "docx", "odt", "rtf"):
+            return "word"
+        if ext in ("xls", "xlsx", "ods", "csv"):
+            return "hoja"
+        if ext in ("ppt", "pptx", "odp"):
+            return "presentacion"
+        if ext in ("md", "markdown", "txt", "log"):
+            return "texto"
+        if self.es_imagen:
+            return "imagen"
+        return "otro"
 
     @property
     def icono(self):

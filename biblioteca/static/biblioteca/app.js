@@ -13,17 +13,32 @@
   const botonTema = $("#boton-tema");
   if (botonTema) {
     botonTema.addEventListener("click", () => {
+      // En «auto» manda el sistema: se parte de lo que se está viendo.
       const ahora = document.documentElement.dataset.tema;
-      const nuevo = ahora === "oscuro" ? "claro" : "oscuro";
+      const oscuroAhora = ahora === "oscuro" ||
+        (ahora === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      const nuevo = oscuroAhora ? "claro" : "oscuro";
       document.documentElement.dataset.tema = nuevo;
       document.cookie = `tema=${nuevo};path=/;max-age=31536000`;
+      // La vista previa de Word/Markdown pinta su marco según el tema: se
+      // vuelve a pedir para que no se quede con el de antes.
+      $$('iframe[src*="/vista/"]').forEach((marco) => { marco.src = marco.src; });
     });
   }
 
-  /* --- Anchos de los paneles (se recuerdan en el navegador) ----------------- */
+  /* --- Ancho del panel de detalle (se recuerda en el navegador) ------------- */
+  /* La clave lleva «v2»: el ancho guardado con la barra lateral de antes era
+     más estrecho y no tiene sentido heredarlo. */
   const raiz = document.documentElement;
-  ["lateral", "detalle"].forEach((cual) => {
-    const guardado = localStorage.getItem(`alejandria-${cual}`);
+  const claveAncho = (cual) => `alejandria-${cual}-v2`;
+  const leer = (clave) => {
+    try { return localStorage.getItem(clave); } catch (_) { return null; }
+  };
+  const apuntar = (clave, valor) => {
+    try { localStorage.setItem(clave, valor); } catch (_) { /* modo privado */ }
+  };
+  ["detalle"].forEach((cual) => {
+    const guardado = leer(claveAncho(cual));
     if (guardado) raiz.style.setProperty(`--${cual}`, guardado);
   });
   $$(".tirador").forEach((tirador) => {
@@ -33,14 +48,15 @@
       const inicio = e.clientX;
       const ancho = parseInt(getComputedStyle(raiz).getPropertyValue(`--${cual}`), 10);
       const mover = (ev) => {
-        const delta = cual === "lateral" ? ev.clientX - inicio : inicio - ev.clientX;
-        const valor = Math.min(640, Math.max(180, ancho + delta));
+        const delta = inicio - ev.clientX;
+        const tope = Math.max(360, Math.round(window.innerWidth * 0.68));
+        const valor = Math.min(tope, Math.max(340, ancho + delta));
         raiz.style.setProperty(`--${cual}`, valor + "px");
       };
       const soltar = () => {
         document.removeEventListener("mousemove", mover);
         document.removeEventListener("mouseup", soltar);
-        localStorage.setItem(`alejandria-${cual}`, getComputedStyle(raiz).getPropertyValue(`--${cual}`));
+        apuntar(claveAncho(cual), getComputedStyle(raiz).getPropertyValue(`--${cual}`).trim());
         document.body.style.userSelect = "";
       };
       document.body.style.userSelect = "none";
@@ -49,7 +65,7 @@
     });
   });
 
-  /* --- Barra lateral: filtrar listas largas y recordar secciones ------------- */
+  /* --- Barra de filtros: desplegables y listas largas ------------------------ */
   $$(".filtro-lista").forEach((caja) => {
     const lista = $(caja.dataset.filtra);
     if (!lista) return;
@@ -61,13 +77,25 @@
     });
   });
 
-  $$("details.grupo").forEach((seccion, i) => {
-    const clave = `alejandria-seccion-${seccion.id || i}`;
-    const guardado = localStorage.getItem(clave);
-    if (guardado !== null) seccion.open = guardado === "1";
-    seccion.addEventListener("toggle", () => {
-      localStorage.setItem(clave, seccion.open ? "1" : "0");
+  // Un desplegable abierto a la vez; se cierra al pulsar fuera o con Escape.
+  const desplegables = $$("details.desplegable");
+  desplegables.forEach((d) => {
+    d.addEventListener("toggle", () => {
+      if (!d.open) return;
+      desplegables.forEach((otro) => { if (otro !== d) otro.open = false; });
+      const caja = $(".filtro-lista", d);
+      if (caja) caja.focus();
     });
+  });
+  document.addEventListener("click", (e) => {
+    desplegables.forEach((d) => { if (d.open && !d.contains(e.target)) d.open = false; });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const abierto = desplegables.find((d) => d.open);
+    if (!abierto) return;
+    abierto.open = false;
+    $("summary", abierto).focus();
   });
 
   /* --- Selección de documentos y panel de detalle --------------------------- */
@@ -121,6 +149,15 @@
     const dialogo = $("#dialogo-subida");
     if (dialogo && dialogo.open) return;  // la ventana de subida manda mientras esté abierta
     const escribiendo = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    // Ctrl/Cmd + S guarda la ficha, también con el cursor dentro de un campo.
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      const ficha = $("#ficha-documento");
+      if (ficha) {
+        e.preventDefault();
+        ficha.requestSubmit();
+      }
+      return;
+    }
     if (e.key === "/" && !escribiendo) {
       e.preventDefault();
       $("#q") && $("#q").focus();
@@ -302,9 +339,9 @@
 
   /* --- Recién llegados ------------------------------------------------------- */
   /* Al catalogar uno desde esa colección su fila sobra: se va de la lista y el
-     contador de la barra lateral baja, sin recargar la página entera. */
+     contador del desplegable de colecciones baja, sin recargar la página. */
   function sacarDeRecien(id) {
-    const insignia = $(".fila-lateral.recien .insignia");
+    const insignia = $(".opcion.recien .insignia");
     if (insignia) {
       insignia.textContent = Math.max(0, parseInt(insignia.textContent, 10) - 1);
     }
@@ -314,10 +351,55 @@
   }
 
   /* --- Guardar la ficha sin recargar ---------------------------------------- */
+  /* Solo se cambian la cabecera y la ficha: la vista previa se queda donde
+     está, sin volver a cargar el PDF cada vez que se guarda. */
+  function sustituirPartes(html) {
+    const nuevo = document.createElement("div");
+    nuevo.innerHTML = html;
+    const partes = $$(":scope > [data-parte]", nuevo);
+    const viejas = $$(":scope > [data-parte]", detalle);
+    if (!partes.length || partes.length !== viejas.length) {
+      detalle.innerHTML = html;  // estructura distinta: se pinta entera
+      return;
+    }
+    partes.forEach((parte) => {
+      if (parte.dataset.parte === "vista") return;
+      const vieja = $(`:scope > [data-parte="${parte.dataset.parte}"]`, detalle);
+      if (vieja) vieja.replaceWith(parte);
+    });
+  }
+
+  function marcarEstado(estado) {
+    const aviso = $("#estado-ficha");
+    if (aviso) aviso.dataset.estado = estado;
+  }
+
   function engancharFicha() {
     const ficha = $("#ficha-documento");
     if (!ficha) return;
     engancharCampos();
+
+    ficha.addEventListener("input", () => marcarEstado("sucio"));
+    ficha.addEventListener("change", () => marcarEstado("sucio"));
+
+    // La estrella de la cabecera es un atajo a la casilla de Favorito.
+    const estrella = $("#boton-estrella");
+    const casillaFavorito = $("#casilla-favorito");
+    if (estrella && casillaFavorito) {
+      estrella.addEventListener("click", () => {
+        casillaFavorito.checked = !casillaFavorito.checked;
+        ficha.requestSubmit();
+      });
+    }
+
+    const botonNuevaEtiqueta = $("#boton-nueva-etiqueta");
+    const nuevasEtiquetas = $("#etiquetas-nuevas");
+    if (botonNuevaEtiqueta && nuevasEtiquetas) {
+      botonNuevaEtiqueta.addEventListener("click", () => {
+        nuevasEtiquetas.hidden = !nuevasEtiquetas.hidden;
+        if (!nuevasEtiquetas.hidden) nuevasEtiquetas.focus();
+      });
+    }
 
     // «Ya está»: lo saca de Recién llegados sin tener que ponerle nada.
     const botonCatalogado = $("#boton-catalogado");
@@ -338,10 +420,14 @@
         body: new FormData(ficha),
         headers: { "X-Parcial": "1", "X-CSRFToken": csrf() },
       })
-        .then((r) => r.text())
+        .then((r) => {
+          if (!r.ok) throw new Error(r.status);
+          return r.text();
+        })
         .then((html) => {
-          detalle.innerHTML = html;
+          sustituirPartes(html);
           engancharFicha();
+          marcarEstado("guardado");
           const aviso = $("#aviso-guardado");
           if (aviso) {
             aviso.hidden = false;

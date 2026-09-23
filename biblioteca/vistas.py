@@ -11,6 +11,7 @@ import tempfile
 import zipfile
 import mimetypes
 import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -27,7 +28,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import busqueda, escaner, miniaturas
+from . import busqueda, escaner, miniaturas, vista_previa
 from .models import (
     BusquedaGuardada, CampoPersonalizado, Corresponsal, Documento, Etiqueta,
     Registro, TipoDocumento, ValorCampo,
@@ -157,6 +158,13 @@ def contexto_lateral(peticion):
     # para que digan cuántos de los documentos que estás viendo son favoritos.
     ambito = conjunto(peticion, excepto={"vista"})
 
+    # Los filtros puestos, agrupados por clase: la barra de filtros los usa
+    # para decir en cada desplegable qué hay elegido sin abrirlo.
+    activos = _filtros_activos(peticion)
+    resumen = {}
+    for f in activos:
+        resumen.setdefault(f["clase"], []).append(f["texto"])
+
     return {
         "arbol": _arbol_etiquetas(peticion),
         "corresponsales": corresponsales,
@@ -188,7 +196,8 @@ def contexto_lateral(peticion):
             ),
         },
         "carpeta_buzon": settings.CARPETA_BUZON,
-        "activos": _filtros_activos(peticion),
+        "activos": activos,
+        "resumen": resumen,
     }
 
 
@@ -221,9 +230,12 @@ def _filtros_activos(peticion):
 # --- Listado ------------------------------------------------------------------
 @acceso
 def biblioteca(peticion):
+    inicio = time.perf_counter()
     qs, filtros = filtrar(peticion)
     paginador = Paginator(qs, settings.PAGINADO)
     pagina = paginador.get_page(peticion.GET.get("pagina"))
+    pagina.object_list = list(pagina.object_list)  # que la consulta cuente en el tiempo
+    duracion_ms = round((time.perf_counter() - inicio) * 1000)
 
     seleccion = peticion.GET.get("doc")
     actual = None
@@ -239,6 +251,7 @@ def biblioteca(peticion):
         "actual": actual,
         "presentacion": peticion.GET.get("modo", peticion.COOKIES.get("modo", "lista")),
         "consulta": consulta_actual(peticion),
+        "duracion_ms": duracion_ms,
         **contexto_lateral(peticion),
     }
     if actual is not None:
@@ -247,8 +260,8 @@ def biblioteca(peticion):
     parcial = peticion.GET.get("parcial")
     if parcial == "lista":
         return render(peticion, "biblioteca/partes/lista.html", contexto)
-    if parcial == "lateral":
-        return render(peticion, "biblioteca/partes/lateral.html", contexto)
+    if parcial in ("filtros", "lateral"):
+        return render(peticion, "biblioteca/partes/filtros.html", contexto)
     respuesta = render(peticion, "biblioteca/biblioteca.html", contexto)
     if peticion.GET.get("modo"):
         respuesta.set_cookie("modo", contexto["presentacion"], max_age=60 * 60 * 24 * 365)
@@ -265,6 +278,9 @@ def _contexto_documento(doc):
     ids_usados = {v.campo_id for v in usados}
     return {
         "doc": doc,
+        # Un conjunto de claves: preguntar «e in doc.etiquetas.all» en la
+        # plantilla lanzaba una consulta por cada etiqueta de la biblioteca.
+        "etiquetas_doc": set(doc.etiquetas.values_list("pk", flat=True)),
         "campos_usados": usados,
         "campos_disponibles": CampoPersonalizado.objects.exclude(pk__in=ids_usados),
         "tipos_campo": CampoPersonalizado.TIPOS,
@@ -544,6 +560,39 @@ def fichero(peticion, pk, adjunto=False):
 
     respuesta = FileResponse(open(ruta, "rb"), content_type=tipo)
     respuesta["Content-Disposition"] = cabecera
+    return respuesta
+
+
+@acceso
+def vista(peticion, pk):
+    """Word, Markdown y texto traducidos a HTML para la vista previa.
+
+    Se sirve como página aparte, dentro de un iframe con sandbox y una CSP que
+    no deja ejecutar nada: el contenido ya va escapado, pero así un documento
+    raro tampoco puede tocar la aplicación.
+    """
+    doc = get_object_or_404(Documento, pk=pk)
+    ruta = doc.ruta_absoluta
+    if not ruta.is_file():
+        raise Http404("El fichero ya no está en la carpeta.")
+    if not vista_previa.soportado(doc.extension):
+        raise Http404("Sin vista previa para este formato.")
+    try:
+        contenido, error = vista_previa.generar(ruta, doc.extension), ""
+    except vista_previa.SinVista as e:
+        contenido, error = "", str(e)
+    except Exception:  # un fichero corrupto no debe dar un 500 en el panel
+        log.exception("Vista previa fallida: %s", doc.ruta)
+        contenido, error = "", "No se pudo preparar la vista previa de este fichero."
+    respuesta = render(peticion, "biblioteca/vista_documento.html", {
+        "doc": doc, "contenido": contenido, "error": error,
+        "tema": peticion.COOKIES.get("tema", "auto"),
+    })
+    respuesta["Content-Security-Policy"] = (
+        "default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; "
+        "base-uri 'none'; form-action 'none'"
+    )
+    respuesta["Cache-Control"] = "private, no-cache"  # el tema puede cambiar
     return respuesta
 
 
