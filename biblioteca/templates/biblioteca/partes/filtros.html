@@ -1,0 +1,184 @@
+{% load biblioteca_extras %}
+{% comment %}
+Barra de filtros horizontal. Sustituye a la antigua barra lateral: los mismos
+filtros, pero plegados en desplegables encima de la lista, para dejarle todo el
+ancho a los documentos y a la vista previa.
+{% endcomment %}
+<div class="filtros-desplegables">
+
+  {# --- Colección ------------------------------------------------------------ #}
+  <details class="desplegable">
+    <summary class="selector-filtro {% if filtros.vista or filtros.carpeta == carpeta_buzon and carpeta_buzon %}puesto{% endif %}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span class="nombre-filtro">Colección:</span>
+      <strong>{% if filtros.vista == 'por_revisar' %}Recién llegados{% elif filtros.vista == 'favoritos' %}Favoritos{% elif filtros.vista == 'sin_clasificar' %}Sin clasificar{% elif filtros.vista == 'problemas' %}Ficheros ausentes{% elif filtros.vista == 'papelera' %}Papelera{% elif carpeta_buzon and filtros.carpeta == carpeta_buzon %}Sin colocar{% else %}Todos{% endif %}</strong>
+      <span class="contador">{% if filtros.vista == 'por_revisar' %}{{ totales.por_revisar }}{% elif filtros.vista == 'favoritos' %}{{ totales.favoritos }}{% elif filtros.vista == 'sin_clasificar' %}{{ totales.sin_clasificar }}{% elif filtros.vista == 'problemas' %}{{ totales.problemas }}{% elif filtros.vista == 'papelera' %}{{ totales.papelera }}{% else %}{{ totales.todos }}{% endif %}</span>
+      <i class="flecha" aria-hidden="true"></i>
+    </summary>
+    <div class="menu">
+      <p class="titulo-menu">Colecciones</p>
+      <a class="opcion {% if not filtros.vista %}activa{% endif %}" href="?{% consulta vista=None %}">
+        <span>Todos</span><em>{{ totales.todos }}</em></a>
+      {% if totales.por_revisar or filtros.vista == 'por_revisar' %}
+      {% comment %}
+      Enlace limpio a propósito: es el «acabo de subir esto, enséñamelo», y con los
+      filtros de antes puestos podría no enseñar nada.
+      {% endcomment %}
+      <a class="opcion recien {% if filtros.vista == 'por_revisar' %}activa{% endif %}"
+         href="{% url 'biblioteca:biblioteca' %}?vista=por_revisar"
+         title="Lo que ha entrado por el buzón o por el botón de subir y aún no has catalogado">
+        <span>📥 Recién llegados</span><em class="insignia">{{ totales.por_revisar }}</em></a>
+      {% endif %}
+      {% if totales.en_buzon %}
+      {% comment %}
+      Distinto de «Recién llegados»: aquel se apaga en cuanto catalogas el documento,
+      pero el fichero sigue en la carpeta del buzón hasta que lo mueves a su sitio.
+      {% endcomment %}
+      <a class="opcion {% if filtros.carpeta == carpeta_buzon %}activa{% endif %}"
+         href="{% url 'biblioteca:biblioteca' %}?carpeta={{ carpeta_buzon|urlencode }}"
+         title="Ficheros que siguen en la carpeta de entrada, sin colocar en su carpeta">
+        <span>📦 Sin colocar</span><em class="insignia">{{ totales.en_buzon }}</em></a>
+      {% endif %}
+      <a class="opcion {% if filtros.vista == 'favoritos' %}activa{% endif %}" href="?{% consulta vista='favoritos' %}">
+        <span>★ Favoritos</span><em>{{ totales.favoritos }}</em></a>
+      <a class="opcion {% if filtros.vista == 'sin_clasificar' %}activa{% endif %}" href="?{% consulta vista='sin_clasificar' %}">
+        <span>Sin clasificar</span><em>{{ totales.sin_clasificar }}</em></a>
+      {% if totales.problemas %}
+      <a class="opcion aviso {% if filtros.vista == 'problemas' %}activa{% endif %}" href="?{% consulta vista='problemas' %}">
+        <span>⚠ Ficheros ausentes</span><em>{{ totales.problemas }}</em></a>
+      {% endif %}
+      <a class="opcion {% if filtros.vista == 'papelera' %}activa{% endif %}" href="?{% consulta vista='papelera' %}">
+        <span>Papelera</span><em>{{ totales.papelera }}</em></a>
+      {% if guardadas %}
+        <p class="titulo-menu">Búsquedas guardadas</p>
+        {% for g in guardadas %}
+          <a class="opcion" href="?{{ g.consulta }}"><span>{{ g.icono }} {{ g.nombre }}</span></a>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </details>
+
+  {# --- Etiquetas ------------------------------------------------------------ #}
+  <details class="desplegable" id="desplegable-etiquetas">
+    <summary class="selector-filtro {% if resumen.etiqueta %}puesto{% endif %}">
+      <i class="punto" style="background:{% if resumen.etiqueta %}var(--exito){% else %}var(--texto-suave){% endif %}"></i>
+      <span class="nombre-filtro">Etiquetas:</span>
+      <strong>{{ resumen.etiqueta|resumen_nombres:"Todas" }}</strong>
+      {% if resumen.etiqueta %}<span class="contador">{{ resumen.etiqueta|length }}</span>{% endif %}
+      <i class="flecha" aria-hidden="true"></i>
+    </summary>
+    <div class="menu ancho">
+      <div class="cabecera-menu">
+        <p class="titulo-menu">Etiquetas</p>
+        <a class="mini" href="{% url 'biblioteca:organizar' %}#etiquetas">editar</a>
+      </div>
+      {% comment %}
+      El interruptor va siempre a la vista, no solo cuando ya hay una elegida: así se
+      sabe de antemano qué va a pasar al pulsar la segunda.
+      {% endcomment %}
+      <div class="modo-etiquetas">
+        <span>Que tengan</span>
+        <a class="{% if filtros.modo_etiquetas == 'o' %}activo{% endif %}"
+           href="?{% consulta modo_etiquetas=None %}"
+           title="Los documentos que tengan cualquiera de las etiquetas elegidas">cualquiera</a>
+        <a class="{% if filtros.modo_etiquetas == 'y' %}activo{% endif %}"
+           href="?{% consulta modo_etiquetas='y' %}"
+           title="Solo los documentos que tengan todas las etiquetas elegidas">todas</a>
+      </div>
+      {% if arbol|length > 8 %}
+        <input type="search" class="filtro-lista" placeholder="Filtrar etiquetas…"
+               data-filtra="#lista-etiquetas" autocomplete="off">
+      {% endif %}
+      <div class="lista-facetas" id="lista-etiquetas">
+        {% for e in arbol %}
+          <a class="opcion faceta {% if e.elegida %}activa{% endif %}"
+             style="padding-left:{{ e.nivel|sangria }}px"
+             href="?{% alterna_consulta 'etiqueta' e.pk %}" data-nombre="{{ e.nombre|lower }}"
+             {% if e.sin_cruce %}title="Solo se queda porque cuelgan etiquetas de ella: no se cruza con las elegidas."{% endif %}>
+            <span><i class="punto" style="background:{{ e.color }}"></i>{{ e.nombre }}</span>
+            <em>{{ e.total }}</em>
+          </a>
+        {% empty %}
+          <p class="nada">Ninguna con documentos aquí.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </details>
+
+  {# --- Corresponsal --------------------------------------------------------- #}
+  <details class="desplegable">
+    <summary class="selector-filtro {% if resumen.corresponsal %}puesto{% endif %}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M10 21v-4h4v4"/></svg>
+      <span class="nombre-filtro">Corresponsal:</span>
+      <strong>{{ resumen.corresponsal|resumen_nombres:"Todos" }}</strong>
+      <span class="contador">{{ corresponsales|length }}</span>
+      <i class="flecha" aria-hidden="true"></i>
+    </summary>
+    <div class="menu">
+      <p class="titulo-menu">Corresponsales</p>
+      {% if corresponsales|length > 8 %}
+        <input type="search" class="filtro-lista" placeholder="Filtrar corresponsales…"
+               data-filtra="#lista-corresponsales" autocomplete="off">
+      {% endif %}
+      <div class="lista-facetas" id="lista-corresponsales">
+      {% for c in corresponsales %}
+        <a class="opcion faceta {% if c.elegido %}activa{% endif %}" data-nombre="{{ c.nombre|lower }}"
+           href="?{% alterna_consulta 'corresponsal' c.pk %}"><span>{{ c.nombre }}</span><em>{{ c.total }}</em></a>
+      {% empty %}<p class="nada">Ninguno aquí.</p>{% endfor %}
+      </div>
+    </div>
+  </details>
+
+  {# --- Tipo ----------------------------------------------------------------- #}
+  <details class="desplegable">
+    <summary class="selector-filtro {% if resumen.tipo %}puesto{% endif %}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+      <span class="nombre-filtro">Tipo:</span>
+      <strong>{{ resumen.tipo|resumen_nombres:"Todos" }}</strong>
+      <span class="contador">{{ tipos|length }}</span>
+      <i class="flecha" aria-hidden="true"></i>
+    </summary>
+    <div class="menu">
+      <p class="titulo-menu">Tipos de documento</p>
+      <div class="lista-facetas">
+      {% for t in tipos %}
+        <a class="opcion faceta {% if t.elegido %}activa{% endif %}"
+           href="?{% alterna_consulta 'tipo' t.pk %}"><span>{{ t.nombre }}</span><em>{{ t.total }}</em></a>
+      {% empty %}<p class="nada">Ninguno aquí.</p>{% endfor %}
+      </div>
+    </div>
+  </details>
+
+  {# --- Año ------------------------------------------------------------------ #}
+  <details class="desplegable">
+    <summary class="selector-filtro {% if resumen.anio %}puesto{% endif %}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+      <span class="nombre-filtro">Año:</span>
+      <strong>{{ resumen.anio|resumen_nombres:"Todos" }}</strong>
+      <i class="flecha" aria-hidden="true"></i>
+    </summary>
+    <div class="menu">
+      <p class="titulo-menu">Años</p>
+      <div class="anios">
+      {% for a in anios %}
+        <a class="chip {% if a.elegido %}activa{% endif %}"
+           href="?{% alterna_consulta 'anio' a.anio %}">{{ a.anio }} <em>{{ a.n }}</em></a>
+      {% empty %}<p class="nada">Sin fechas.</p>{% endfor %}
+      </div>
+    </div>
+  </details>
+</div>
+
+{% if activos %}
+<div class="pastillas">
+  {% for f in activos %}
+    <a class="pastilla {{ f.clase }}" href="?{% quitar_filtro f.clave f.valor %}" title="Quitar este filtro">
+      {% if f.color %}<i class="punto" style="background:{{ f.color }}"></i>{% endif %}
+      {% if f.clase == 'corresponsal' %}de:{% elif f.clase == 'tipo' %}tipo:{% elif f.clase == 'anio' %}año:{% elif f.clase == 'carpeta' %}carpeta:{% elif f.clase == 'ext' %}formato:{% endif %}{{ f.texto }}<span class="quitar">×</span>
+    </a>
+  {% endfor %}
+  <a class="limpiar" href="{% url 'biblioteca:biblioteca' %}">Limpiar filtros</a>
+</div>
+{% endif %}
+
+<p class="recuento-filtros"><strong>{{ pagina.paginator.count }}</strong> docs{% if duracion_ms is not None %}<span class="sep">•</span><span class="mono">{{ duracion_ms }}ms</span>{% endif %}</p>

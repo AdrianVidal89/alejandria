@@ -11,6 +11,7 @@ urlpatterns = [
     path("doc/<int:pk>/guardar/", vistas.guardar, name="guardar"),
     path("doc/<int:pk>/fichero/", vistas.fichero, name="fichero"),
     path("doc/<int:pk>/descargar/", vistas.fichero, {"adjunto": True}, name="descargar"),
+    path("doc/<int:pk>/vista/", vistas.vista, name="vista"),
     path("doc/<int:pk>/miniatura/", vistas.miniatura, name="miniatura"),
     path("doc/<int:pk>/mover/", vistas.mover, name="mover"),
     path("acciones/", vistas.acciones, name="acciones"),

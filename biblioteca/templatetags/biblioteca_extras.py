@@ -41,6 +41,14 @@ def como_json(valor):
 
 
 @registrar.filter
+def resumen_nombres(nombres, vacio=""):
+    """«Olivia», «Olivia +2» o el texto por defecto si no hay ninguno."""
+    if not nombres:
+        return vacio
+    return nombres[0] if len(nombres) == 1 else f"{nombres[0]} +{len(nombres) - 1}"
+
+
+@registrar.filter
 def sangria(nivel):
     return 12 + int(nivel) * 14
 

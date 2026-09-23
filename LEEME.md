@@ -33,8 +33,13 @@ contenedores, con un consumo real en reposo de 200-230 MB.
 
 ## Qué hace
 
-- Biblioteca en tres paneles: filtros a la izquierda, lista o miniaturas en el
-  centro, ficha y vista previa a la derecha.
+- Biblioteca en dos paneles con los filtros en una barra de desplegables encima
+  (colección, etiquetas, corresponsal, tipo y año): la lista o las miniaturas a
+  la izquierda y la ficha con su vista previa a la derecha, con el ancho
+  ajustable. Tema oscuro azul noche y tema claro.
+- Vista previa de PDF, imágenes, **Word (.docx)**, **Markdown** y texto plano.
+  Word y Markdown se traducen a HTML en el servidor con la librería estándar
+  (sin dependencias nuevas) y se enseñan en un marco aislado, sin scripts.
 - Etiquetas **jerárquicas** con color, corresponsales, tipos de documento y
   campos personalizados (texto, número, fecha, sí/no, importe, enlace, lista).
   Los campos se eligen de una lista —varios de una vez— y aparecen en la ficha
@@ -42,24 +47,25 @@ contenedores, con un consumo real en reposo de 200-230 MB.
 - Búsqueda instantánea con prefijos y sin tildes, filtros combinables por
   etiqueta (incluyendo su rama), corresponsal, tipo, año, formato y carpeta.
 - **Varias etiquetas a la vez.** Por defecto suman (cualquiera de ellas), con un
-  interruptor en la barra lateral para exigirlas todas. Una etiqueta nunca
+  interruptor en el desplegable de etiquetas para exigirlas todas. Una etiqueta nunca
   desaparece de la lista por haber elegido otra: como mucho se atenúa si no se
   cruza con ella, y se sigue pudiendo pulsar.
-- Búsquedas guardadas fijadas en la barra lateral (las "carpetas inteligentes").
+- Búsquedas guardadas en el desplegable de colecciones (las "carpetas inteligentes").
 - Selección múltiple y acciones en bloque: etiquetar, asignar corresponsal,
   mandar a la papelera.
 - Buzón de entrada: se sueltan ficheros (o se suben desde la aplicación) y se
   archivan solos con el patrón `{año}/{corresponsal}/{título}`, sacando la fecha
   del nombre del fichero.
 - **Recién llegados.** Todo lo que entra por el buzón o por el botón de subir
-  queda apartado en esa colección, con su número en la barra lateral, hasta que
+  queda apartado en esa colección, con su número en el desplegable, hasta que
   se cataloga. En cuanto un documento tiene etiqueta, corresponsal o tipo, sale
   solo de la lista (o se saca a mano con «Ya está»).
 - Subir documentos abre una ventana con zona de arrastrar y botón de buscar:
   acepta varios a la vez, se pueden ir acumulando y al terminar deja abierta la
   lista de recién llegados con el primero listo para catalogar.
 - Importación completa de una instalación de paperless-ngx.
-- Teclado: `/` busca, `j`/`k` se mueven por la lista, `Intro` abre el documento.
+- Teclado: `/` busca, `j`/`k` se mueven por la lista, `Intro` abre el documento,
+  `Ctrl`+`S` guarda la ficha.
 
 ## Probarlo en el escritorio
 
