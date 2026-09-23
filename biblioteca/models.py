@@ -233,7 +233,7 @@ class Documento(models.Model):
 
     @property
     def es_word(self):
-        return self.extension == "docx"
+        return self.extension in ("doc", "docx")
 
     @property
     def es_markdown(self):

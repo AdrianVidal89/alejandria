@@ -157,6 +157,9 @@ html[data-tema="oscuro"] #boton-tema .luna { display: none; }
   background: var(--panel); border-bottom: 1px solid var(--borde); position: relative; z-index: 25;
 }
 .filtros-desplegables { display: flex; flex-wrap: wrap; gap: 10px; }
+/* Mientras llega la lista con el filtro nuevo: el menú sigue abierto y usable. */
+.barra-filtros.cargando { cursor: progress; }
+.barra-filtros.cargando .menu, .barra-filtros.cargando .recuento-filtros { opacity: .65; transition: opacity .15s; }
 .desplegable { position: relative; }
 .selector-filtro {
   list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;

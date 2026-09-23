@@ -1,6 +1,8 @@
 """Vista previa de Word (.docx), Markdown y texto plano, sin dependencias.
 
-Un .docx es un zip con XML dentro: se lee `word/document.xml` con la librería
+Un .doc (Word 97-2003) es un contenedor OLE con el texto en binario: se saca
+el texto con su tabla de trozos (piece table), sin formato pero con párrafos,
+tablas y saltos. Un .docx es un zip con XML dentro: se lee `word/document.xml` con la librería
 estándar y se traduce a HTML sencillo (títulos, párrafos, negritas, listas,
 tablas, enlaces e imágenes incrustadas). El Markdown se traduce con un
 intérprete pequeño que cubre lo que se escribe a diario. Todo el texto se
@@ -12,6 +14,7 @@ reconocer el documento de un vistazo sin salir de la biblioteca.
 """
 import base64
 import html
+import struct
 import re
 import zipfile
 from xml.etree import ElementTree
@@ -23,6 +26,7 @@ MAX_BYTES_IMAGENES = 6 * 1024 * 1024    # imágenes incrustadas, en total
 
 EXTENSIONES_MARKDOWN = ("md", "markdown")
 EXTENSIONES_WORD = ("docx",)
+EXTENSIONES_WORD_ANTIGUO = ("doc",)
 EXTENSIONES_TEXTO = ("txt", "csv", "log", "json", "xml", "yml", "yaml")
 
 
@@ -31,13 +35,17 @@ class SinVista(Exception):
 
 
 def soportado(extension):
-    return extension in EXTENSIONES_MARKDOWN + EXTENSIONES_WORD + EXTENSIONES_TEXTO
+    return extension in (
+        EXTENSIONES_MARKDOWN + EXTENSIONES_WORD + EXTENSIONES_WORD_ANTIGUO + EXTENSIONES_TEXTO
+    )
 
 
 def generar(ruta, extension):
     """HTML (ya seguro) del cuerpo del documento."""
     if extension in EXTENSIONES_WORD:
         return docx_a_html(ruta)
+    if extension in EXTENSIONES_WORD_ANTIGUO:
+        return doc_a_html(ruta)
     texto = _leer_texto(ruta)
     if extension in EXTENSIONES_MARKDOWN:
         return markdown_a_html(texto)
@@ -602,3 +610,245 @@ def docx_a_html(ruta):
             return _Docx(z).html()
     except (zipfile.BadZipFile, ElementTree.ParseError, KeyError, OSError) as e:
         raise SinVista("No se pudo leer el documento: parece dañado o no es un Word moderno.") from e
+
+
+# =============================================================================
+# Word 97-2003 (.doc)
+# =============================================================================
+MAX_BYTES_DOC = 64 * 1024 * 1024
+_FIN_CADENA = 0xFFFFFFFE
+
+
+class _Ole:
+    """Lector mínimo de contenedores OLE (Compound File Binary).
+
+    Solo lo necesario para sacar un flujo por su nombre: FAT, mini FAT y
+    directorio. Se lee el fichero entero en memoria, con un techo.
+    """
+
+    def __init__(self, datos):
+        if datos[:8] != b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+            raise SinVista("No es un documento de Word 97-2003.")
+        self.datos = datos
+        self.sector = 1 << struct.unpack_from("<H", datos, 0x1E)[0]
+        self.mini = 1 << struct.unpack_from("<H", datos, 0x20)[0]
+        (n_fat, dir_ini, _, self.corte, minifat_ini, n_minifat,
+         difat_ini, n_difat) = struct.unpack_from("<IIIIIIII", datos, 0x2C)
+
+        sectores_fat = list(struct.unpack_from("<109I", datos, 0x4C))
+        siguiente, vistos = difat_ini, 0
+        por_sector = self.sector // 4
+        while siguiente < _FIN_CADENA and vistos < n_difat:
+            bloque = struct.unpack_from(f"<{por_sector}I", datos, self._pos(siguiente))
+            sectores_fat.extend(bloque[:-1])
+            siguiente, vistos = bloque[-1], vistos + 1
+        self.fat = []
+        for sid in sectores_fat[:n_fat]:
+            self.fat.extend(struct.unpack_from(f"<{por_sector}I", datos, self._pos(sid)))
+
+        directorio = self._cadena(dir_ini)
+        todas = []
+        for i in range(0, len(directorio) - 127, 128):
+            largo = struct.unpack_from("<H", directorio, i + 64)[0]
+            nombre = directorio[i:i + max(0, largo - 2)].decode("utf-16-le", "replace")
+            izquierda, derecha, hijo = struct.unpack_from("<III", directorio, i + 68)
+            inicio, tamano = struct.unpack_from("<II", directorio, i + 116)
+            todas.append((nombre, directorio[i + 66], inicio, tamano, izquierda, derecha, hijo))
+
+        # Solo los hijos directos de la raíz: los objetos incrustados (una hoja
+        # de cálculo, otro Word) traen sus propios «1Table» y «WordDocument».
+        self.entradas = {}
+        raiz = todas[0] if todas and todas[0][1] == 5 else None
+        pendientes, vistos = [raiz[6]] if raiz else [], set()
+        while pendientes:
+            k = pendientes.pop()
+            if k >= len(todas) or k in vistos:
+                continue
+            vistos.add(k)
+            nombre, tipo, inicio, tamano, izquierda, derecha, _ = todas[k]
+            if tipo in (1, 2):
+                self.entradas[nombre] = (tipo, inicio, tamano)
+            pendientes.extend((izquierda, derecha))
+        raiz = raiz and (raiz[1], raiz[2], raiz[3])
+        self.minis = self._cadena(raiz[1]) if raiz else b""
+        self.minifat = []
+        if n_minifat:
+            bloque = self._cadena(minifat_ini)
+            self.minifat = list(struct.unpack_from(f"<{len(bloque) // 4}I", bloque))
+
+    def _pos(self, sid):
+        pos = (sid + 1) * self.sector
+        if pos + self.sector > len(self.datos):
+            raise SinVista("El documento está cortado o dañado.")
+        return pos
+
+    def _cadena(self, sid, tabla=None, tam=None, datos=None):
+        tabla = self.fat if tabla is None else tabla
+        tam = tam or self.sector
+        partes, vistos = [], set()
+        while sid < _FIN_CADENA:
+            if sid in vistos or sid >= len(tabla):
+                raise SinVista("El documento está dañado.")
+            vistos.add(sid)
+            if datos is None:
+                inicio = self._pos(sid)
+                partes.append(self.datos[inicio:inicio + tam])
+            else:
+                partes.append(datos[sid * tam:(sid + 1) * tam])
+            sid = tabla[sid]
+        return b"".join(partes)
+
+    def flujo(self, nombre):
+        entrada = self.entradas.get(nombre)
+        if not entrada or entrada[0] != 2:
+            return None
+        _, inicio, tamano = entrada
+        if tamano < self.corte:
+            datos = self._cadena(inicio, self.minifat, self.mini, self.minis)
+        else:
+            datos = self._cadena(inicio)
+        return datos[:tamano]
+
+
+def _texto_doc(ruta):
+    """Texto del cuerpo de un .doc (Word 97 en adelante), con sus marcas."""
+    if ruta.stat().st_size > MAX_BYTES_DOC:
+        raise SinVista("El documento es demasiado grande para la vista previa.")
+    ole = _Ole(ruta.read_bytes())
+    palabra = ole.flujo("WordDocument")
+    if not palabra or len(palabra) < 0x200:
+        raise SinVista("No es un documento de Word 97-2003.")
+    ident, nfib = struct.unpack_from("<HH", palabra, 0)
+    banderas = struct.unpack_from("<H", palabra, 0x0A)[0]
+    if ident != 0xA5EC or nfib < 0xC1:
+        raise SinVista("Es un Word 95 o anterior: sin vista previa. Ábrelo con «Abrir».")
+    if banderas & 0x0100:
+        raise SinVista("El documento está protegido con contraseña.")
+    tabla = ole.flujo("1Table" if banderas & 0x0200 else "0Table")
+    if tabla is None:
+        raise SinVista("Al documento le falta su tabla interna.")
+
+    # FIB: FibBase (32 bytes) + FibRgW + FibRgLw + FibRgFcLcb, cada uno con su
+    # contador delante. ccpText es el cuarto entero de FibRgLw; fcClx/lcbClx
+    # es la pareja 33 de FibRgFcLcb.
+    pos = 32
+    csw = struct.unpack_from("<H", palabra, pos)[0]
+    pos += 2 + csw * 2
+    cslw = struct.unpack_from("<H", palabra, pos)[0]
+    rglw = pos + 2
+    ccp_texto = struct.unpack_from("<i", palabra, rglw + 12)[0]
+    pos = rglw + cslw * 4
+    rgfclcb = pos + 2
+    fc_clx, lcb_clx = struct.unpack_from("<II", palabra, rgfclcb + 33 * 8)
+    clx = tabla[fc_clx:fc_clx + lcb_clx]
+
+    # Clx: Prc (0x01, se saltan) y luego Pcdt (0x02) con la tabla de trozos.
+    i = 0
+    while i < len(clx) and clx[i] == 0x01:
+        i += 3 + struct.unpack_from("<h", clx, i + 1)[0]
+    if i >= len(clx) or clx[i] != 0x02:
+        raise SinVista("No se encontró el texto dentro del documento.")
+    lcb = struct.unpack_from("<I", clx, i + 1)[0]
+    plc = clx[i + 5:i + 5 + lcb]
+    n = (len(plc) - 4) // 12
+    cps = struct.unpack_from(f"<{n + 1}I", plc, 0)
+    trozos = []
+    restante = max(0, ccp_texto)
+    for k in range(n):
+        if restante <= 0:
+            break
+        fc = struct.unpack_from("<I", plc, (n + 1) * 4 + k * 8 + 2)[0]
+        cuantos = min(cps[k + 1] - cps[k], restante)
+        if fc & 0x40000000:
+            inicio = (fc & 0x3FFFFFFF) // 2
+            trozos.append(palabra[inicio:inicio + cuantos].decode("cp1252", "replace"))
+        else:
+            trozos.append(palabra[fc:fc + cuantos * 2].decode("utf-16-le", "replace"))
+        restante -= cuantos
+    return "".join(trozos)
+
+
+def _sin_campos(texto):
+    """Campos de Word ({ PAGE }, hipervínculos…): se queda solo el resultado."""
+    salida, pila = [], []  # pila: True mientras se está en el código del campo
+    for c in texto:
+        if c == "\x13":
+            pila.append(True)
+        elif c == "\x14":
+            if pila:
+                pila[-1] = False
+        elif c == "\x15":
+            if pila:
+                pila.pop()
+        elif not any(pila):
+            salida.append(c)
+    return "".join(salida)
+
+
+def doc_a_html(ruta):
+    try:
+        texto = _sin_campos(_texto_doc(ruta))
+    except SinVista:
+        raise
+    except (struct.error, IndexError, OSError, ValueError) as e:
+        raise SinVista("No se pudo leer el documento: parece dañado.") from e
+    return _doc_texto_a_html(texto)
+
+
+def _doc_texto_a_html(texto):
+    """Marcas de Word a HTML.
+
+    \\r cierra párrafo, \\x07 cierra celda y una marca de celda vacía justo
+    detrás de otra cierra la fila. \\x0b es salto de línea y \\x0c salto de
+    página. Una celda vacía se confunde con un fin de fila en la primera fila;
+    en las siguientes se sabe cuántas columnas tiene la tabla.
+    """
+    def limpio(trozo):
+        # \x01 y \x08: imagen u objeto incrustado. No se pinta, pero se avisa.
+        trozo = "".join(c for c in trozo if c >= " " or c in "\x0b\t\x01\x08")
+        trozo = re.sub(r"[\x01\x08]+", "\x01", trozo)
+        return (html.escape(trozo).replace("\x0b", "<br>").replace("\t", "&emsp;")
+                .replace("\x01", '<span class="sin-imagen">[imagen u objeto]</span>'))
+
+    salida, filas, fila, celda = [], [], [], []
+    columnas, anterior = 0, None
+
+    def cerrar_tabla():
+        nonlocal columnas
+        if fila:
+            filas.append(list(fila))
+            fila.clear()
+        if filas:
+            cuerpo = "".join(
+                "<tr>" + "".join(f"<td>{c}</td>" for c in f) + "</tr>" for f in filas
+            )
+            salida.append(f"<table>{cuerpo}</table>")
+            filas.clear()
+        columnas = 0
+
+    partes = re.split(r"(\r|\x07)", texto.replace("\x0c", "\r"))
+    for k in range(0, len(partes), 2):
+        trozo = partes[k]
+        if k + 1 >= len(partes) and not trozo:
+            break  # lo que queda tras la última marca, vacío
+        marca = partes[k + 1] if k + 1 < len(partes) else "\r"
+        if marca == "\x07":
+            fin_de_fila = (not trozo and not celda and anterior == "\x07" and fila
+                           and (not columnas or len(fila) >= columnas))
+            if fin_de_fila:
+                columnas = columnas or len(fila)
+                filas.append(list(fila))
+                fila.clear()
+            else:
+                celda.append(limpio(trozo))
+                fila.append("<br>".join(c for c in celda if c) or "")
+                celda.clear()
+        elif fila or celda:
+            celda.append(limpio(trozo))  # otro párrafo dentro de la misma celda
+        else:
+            cerrar_tabla()
+            contenido = limpio(trozo)
+            salida.append(f"<p>{contenido}</p>" if contenido.strip() else '<p class="vacio"></p>')
+        anterior = marca
+    cerrar_tabla()
+    return "".join(salida)

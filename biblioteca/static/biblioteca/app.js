@@ -66,40 +66,139 @@
   });
 
   /* --- Barra de filtros: desplegables y listas largas ------------------------ */
-  $$(".filtro-lista").forEach((caja) => {
+  /* Todo va delegado en el documento: la barra y la lista se sustituyen enteras
+     al elegir un filtro y los elementos nuevos tienen que seguir funcionando. */
+  function filtrarLista(caja) {
     const lista = $(caja.dataset.filtra);
     if (!lista) return;
-    caja.addEventListener("input", () => {
-      const texto = caja.value.trim().toLowerCase();
-      $$("[data-nombre]", lista).forEach((fila) => {
-        fila.style.display = !texto || fila.dataset.nombre.includes(texto) ? "" : "none";
-      });
+    const texto = caja.value.trim().toLowerCase();
+    $$("[data-nombre]", lista).forEach((fila) => {
+      fila.style.display = !texto || fila.dataset.nombre.includes(texto) ? "" : "none";
     });
+  }
+  document.addEventListener("input", (e) => {
+    if (e.target.matches(".filtro-lista")) filtrarLista(e.target);
   });
 
-  // Un desplegable abierto a la vez; se cierra al pulsar fuera o con Escape.
-  const desplegables = $$("details.desplegable");
-  desplegables.forEach((d) => {
-    d.addEventListener("toggle", () => {
-      if (!d.open) return;
-      desplegables.forEach((otro) => { if (otro !== d) otro.open = false; });
-      const caja = $(".filtro-lista", d);
-      if (caja) caja.focus();
-    });
-  });
+  // Un desplegable abierto a la vez. Elegir dentro no lo cierra (se pueden
+  // marcar y desmarcar varias opciones seguidas); se cierra al pulsar fuera o
+  // con Escape. «toggle» no burbujea: se escucha en la fase de captura.
+  const desplegables = () => $$("details.desplegable");
+  document.addEventListener("toggle", (e) => {
+    const d = e.target;
+    if (!d.matches || !d.matches("details.desplegable") || !d.open) return;
+    desplegables().forEach((otro) => { if (otro !== d) otro.open = false; });
+    const caja = $(".filtro-lista", d);
+    if (caja && !d.dataset.reabierto) caja.focus();
+    delete d.dataset.reabierto;
+  }, true);
   document.addEventListener("click", (e) => {
-    desplegables.forEach((d) => { if (d.open && !d.contains(e.target)) d.open = false; });
+    desplegables().forEach((d) => { if (d.open && !d.contains(e.target)) d.open = false; });
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
-    const abierto = desplegables.find((d) => d.open);
+    const abierto = desplegables().find((d) => d.open);
     if (!abierto) return;
     abierto.open = false;
     $("summary", abierto).focus();
   });
 
+  /* --- Aplicar filtros sin recargar la página -------------------------------- */
+  /* Se pide la página con el filtro nuevo y se cambian solo la barra de filtros
+     y la lista. El desplegable que estaba abierto se vuelve a abrir tal cual
+     (mismo scroll, mismo texto de búsqueda) y la ficha de la derecha no se toca. */
+  let filtroEnCurso = null;
+  function documentoAbierto() {
+    const ficha = $("#ficha-documento");
+    const m = ficha && ficha.action.match(/doc\/(\d+)/);
+    return m ? m[1] : new URL(location.href).searchParams.get("doc");
+  }
+
+  // El buscador de arriba lleva la colección en un campo oculto: que no se
+  // quede con la de antes de cambiarla desde el desplegable.
+  function sincronizarBuscador(url) {
+    const buscador = $(".buscador");
+    if (!buscador) return;
+    let oculto = $('input[name="vista"]', buscador);
+    const vista = url.searchParams.get("vista");
+    if (vista) {
+      if (!oculto) {
+        oculto = document.createElement("input");
+        oculto.type = "hidden";
+        oculto.name = "vista";
+        buscador.append(oculto);
+      }
+      oculto.value = vista;
+    } else if (oculto) {
+      oculto.remove();
+    }
+  }
+
+  function aplicarFiltro(href) {
+    const destino = new URL(href, location.href);
+    const abierto = documentoAbierto();
+    if (abierto) destino.searchParams.set("doc", abierto);
+
+    const indice = desplegables().findIndex((d) => d.open);
+    const menu = indice >= 0 ? $(".menu", desplegables()[indice]) : null;
+    const recuerdo = {
+      scroll: menu ? $$(".lista-facetas", menu).map((l) => l.scrollTop) : [],
+      texto: menu && $(".filtro-lista", menu) ? $(".filtro-lista", menu).value : "",
+    };
+    const barra = $("#barra-filtros");
+    const central = $("#central");
+    barra.classList.add("cargando");
+
+    if (filtroEnCurso) filtroEnCurso.abort();
+    filtroEnCurso = new AbortController();
+    fetch(destino, { signal: filtroEnCurso.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then((html) => {
+        const nuevo = new DOMParser().parseFromString(html, "text/html");
+        const barraNueva = $("#barra-filtros", nuevo);
+        const centralNuevo = $("#central", nuevo);
+        if (!barraNueva || !centralNuevo) throw new Error("sin partes");
+        barra.innerHTML = barraNueva.innerHTML;
+        central.innerHTML = centralNuevo.innerHTML;
+        document.title = nuevo.title;
+        history.replaceState(null, "", destino);
+        sincronizarBuscador(destino);
+        refrescarSeleccion();
+
+        const otraVez = indice >= 0 ? desplegables()[indice] : null;
+        if (otraVez) {
+          otraVez.dataset.reabierto = "1";
+          otraVez.open = true;
+          const caja = $(".filtro-lista", otraVez);
+          if (caja && recuerdo.texto) {
+            caja.value = recuerdo.texto;
+            filtrarLista(caja);
+          }
+          $$(".lista-facetas", otraVez).forEach((l, i) => {
+            l.scrollTop = recuerdo.scroll[i] || 0;
+          });
+        }
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") location.href = destino;  // plan B: recargar
+      })
+      .finally(() => barra.classList.remove("cargando"));
+  }
+
+  document.addEventListener("click", (e) => {
+    const enlace = e.target.closest(".barra-filtros .menu a, .barra-filtros .pastillas a");
+    if (!enlace || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+    const url = new URL(enlace.href, location.href);
+    // Solo lo que se queda en la biblioteca: «editar» lleva a Organizar.
+    if (url.origin !== location.origin || url.pathname !== location.pathname) return;
+    e.preventDefault();
+    aplicarFiltro(url);
+  });
+
   /* --- Selección de documentos y panel de detalle --------------------------- */
-  const contenedor = $("#documentos");
   const detalle = $("#detalle");
 
   function filas() {
@@ -132,14 +231,16 @@
     }
   }
 
-  if (contenedor) {
-    contenedor.addEventListener("click", (e) => {
+  // Delegado en #central, que se queda aunque la lista de dentro se cambie.
+  const central = $("#central");
+  if (central) {
+    central.addEventListener("click", (e) => {
       if (e.target.matches("input,button,a,label")) return;
-      const fila = e.target.closest("[data-id]");
+      const fila = e.target.closest("#documentos [data-id]");
       if (fila) abrir(fila);
     });
-    contenedor.addEventListener("dblclick", (e) => {
-      const fila = e.target.closest("[data-id]");
+    central.addEventListener("dblclick", (e) => {
+      const fila = e.target.closest("#documentos [data-id]");
       if (fila) window.open(`/doc/${fila.dataset.id}/fichero/`, "_blank");
     });
   }
@@ -164,7 +265,7 @@
       return;
     }
     if (e.key === "Escape" && escribiendo) document.activeElement.blur();
-    if (escribiendo || !contenedor) return;
+    if (escribiendo || !$("#documentos")) return;
     const lista = filas();
     if (!lista.length) return;
     const actual = lista.findIndex((f) => f.classList.contains("activa"));
@@ -446,13 +547,15 @@
   engancharFicha();
 
   /* --- Selección múltiple ---------------------------------------------------- */
-  const acciones = $("#acciones-seleccion");
-  const contador = $("#contador-seleccion");
+  /* Delegado: la barra de acciones vive dentro de la lista, que se sustituye
+     al cambiar de filtro. */
   function seleccionados() {
     return $$(".chk:checked").map((c) => c.value);
   }
   function refrescarSeleccion() {
     const n = seleccionados().length;
+    const acciones = $("#acciones-seleccion");
+    const contador = $("#contador-seleccion");
     if (acciones) acciones.hidden = n === 0;
     if (contador) contador.textContent = `${n} seleccionado${n === 1 ? "" : "s"}`;
   }
@@ -462,43 +565,42 @@
     }
     if (e.target.classList.contains("chk") || e.target.id === "chk-todos") refrescarSeleccion();
   });
-  const formAcciones = $("#form-acciones");
-  if (formAcciones) {
-    formAcciones.addEventListener("submit", () => {
-      formAcciones.querySelectorAll('input[name="ids"]').forEach((i) => i.remove());
-      seleccionados().forEach((id) => {
-        const oculto = document.createElement("input");
-        oculto.type = "hidden";
-        oculto.name = "ids";
-        oculto.value = id;
-        formAcciones.appendChild(oculto);
-      });
+  document.addEventListener("submit", (e) => {
+    const formAcciones = e.target;
+    if (formAcciones.id !== "form-acciones") return;
+    formAcciones.querySelectorAll('input[name="ids"]').forEach((i) => i.remove());
+    seleccionados().forEach((id) => {
+      const oculto = document.createElement("input");
+      oculto.type = "hidden";
+      oculto.name = "ids";
+      oculto.value = id;
+      formAcciones.appendChild(oculto);
     });
-  }
+  });
   // Descargar la selección en un zip: mismo formulario, otro destino.
-  const botonZip = $("#boton-descargar-varios");
-  if (botonZip && formAcciones) {
-    botonZip.addEventListener("click", () => {
-      const ids = seleccionados();
-      if (!ids.length) return;
-      const envio = document.createElement("form");
-      envio.method = "post";
-      envio.action = botonZip.dataset.url || "/descargar-varios/";
-      envio.style.display = "none";
-      const csrf = formAcciones.querySelector('[name="csrfmiddlewaretoken"]');
-      if (csrf) envio.appendChild(csrf.cloneNode());
-      ids.forEach((id) => {
-        const oculto = document.createElement("input");
-        oculto.type = "hidden";
-        oculto.name = "ids";
-        oculto.value = id;
-        envio.appendChild(oculto);
-      });
-      document.body.appendChild(envio);
-      envio.submit();
-      envio.remove();
+  document.addEventListener("click", (e) => {
+    const botonZip = e.target.closest("#boton-descargar-varios");
+    const formAcciones = $("#form-acciones");
+    if (!botonZip || !formAcciones) return;
+    const ids = seleccionados();
+    if (!ids.length) return;
+    const envio = document.createElement("form");
+    envio.method = "post";
+    envio.action = botonZip.dataset.url || "/descargar-varios/";
+    envio.style.display = "none";
+    const csrf = formAcciones.querySelector('[name="csrfmiddlewaretoken"]');
+    if (csrf) envio.appendChild(csrf.cloneNode());
+    ids.forEach((id) => {
+      const oculto = document.createElement("input");
+      oculto.type = "hidden";
+      oculto.name = "ids";
+      oculto.value = id;
+      envio.appendChild(oculto);
     });
-  }
+    document.body.appendChild(envio);
+    envio.submit();
+    envio.remove();
+  });
 
   refrescarSeleccion();
 

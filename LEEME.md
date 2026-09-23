@@ -37,9 +37,14 @@ contenedores, con un consumo real en reposo de 200-230 MB.
   (colección, etiquetas, corresponsal, tipo y año): la lista o las miniaturas a
   la izquierda y la ficha con su vista previa a la derecha, con el ancho
   ajustable. Tema oscuro azul noche y tema claro.
-- Vista previa de PDF, imágenes, **Word (.docx)**, **Markdown** y texto plano.
-  Word y Markdown se traducen a HTML en el servidor con la librería estándar
-  (sin dependencias nuevas) y se enseñan en un marco aislado, sin scripts.
+- Vista previa de PDF, imágenes, **Word (.docx y .doc)**, **Markdown** y texto
+  plano. Word y Markdown se traducen a HTML en el servidor con la librería
+  estándar (sin dependencias nuevas) y se enseñan en un marco aislado, sin
+  scripts. Del .doc antiguo (Word 97-2003) sale el texto con párrafos y tablas,
+  sin formato; los de Word 95 o con contraseña no tienen vista previa.
+- Los desplegables de filtros no se cierran al elegir: se marcan y desmarcan
+  varias opciones seguidas y la lista se actualiza al momento, sin recargar.
+  Se cierran al pulsar fuera o con `Esc`.
 - Etiquetas **jerárquicas** con color, corresponsales, tipos de documento y
   campos personalizados (texto, número, fecha, sí/no, importe, enlace, lista).
   Los campos se eligen de una lista —varios de una vez— y aparecen en la ficha
