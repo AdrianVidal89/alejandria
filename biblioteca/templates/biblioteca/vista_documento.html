@@ -15,8 +15,8 @@ igual en tema claro que en oscuro, que es como se ve un documento de verdad.
      opaco y del mismo esquema de color que la página que lo contiene: si no,
      el navegador pinta el iframe de blanco en tema oscuro. */
   :root { color-scheme: light; --marco: #dfe5ee; }
-  {% if tema == "oscuro" %}:root { color-scheme: dark; --marco: #05080f; }
-  {% elif tema != "claro" %}@media (prefers-color-scheme: dark) { :root { color-scheme: dark; --marco: #05080f; } }{% endif %}
+  {% if tema == "oscuro" %}:root { color-scheme: dark; --marco: #000; }
+  {% elif tema != "claro" %}@media (prefers-color-scheme: dark) { :root { color-scheme: dark; --marco: #000; } }{% endif %}
   html { background: var(--marco); }
   body {
     margin: 0; padding: 14px; background: transparent;
@@ -24,6 +24,7 @@ igual en tema claro que en oscuro, que es como se ve un documento de verdad.
     color: #1f2328;
   }
   .hoja {
+    color-scheme: light;  /* el papel es claro aunque el marco sea oscuro */
     background: #fbfaf7; border-radius: 4px; padding: 34px 40px 44px;
     box-shadow: 0 1px 2px rgba(0,0,0,.25), 0 10px 30px rgba(0,0,0,.28);
     max-width: 860px; margin: 0 auto; overflow-wrap: anywhere; min-height: 200px;

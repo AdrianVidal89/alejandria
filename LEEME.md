@@ -36,7 +36,9 @@ contenedores, con un consumo real en reposo de 200-230 MB.
 - Biblioteca en dos paneles con los filtros en una barra de desplegables encima
   (colección, etiquetas, corresponsal, tipo y año): la lista o las miniaturas a
   la izquierda y la ficha con su vista previa a la derecha, con el ancho
-  ajustable. Tema oscuro azul noche y tema claro.
+  ajustable. Tema oscuro al estilo *Tron: Legacy* (negro, rejilla, cian de
+  neón con brillo y naranja para avisos, letra Orbitron servida desde la propia
+  aplicación) y un tema claro sobrio.
 - Vista previa de PDF, imágenes, **Word (.docx y .doc)**, **Markdown** y texto
   plano. Word y Markdown se traducen a HTML en el servidor con la librería
   estándar (sin dependencias nuevas) y se enseñan en un marco aislado, sin
