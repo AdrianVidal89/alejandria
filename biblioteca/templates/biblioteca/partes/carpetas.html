@@ -1,0 +1,31 @@
+{% load biblioteca_extras %}
+{% comment %}
+El árbol de carpetas del modo clásico. Son las carpetas de verdad del disco, no
+etiquetas: aquí no hay nada que Alejandria haya inventado. Se abre solo por el
+camino en el que estás, para que no se desborde a cientos de líneas.
+{% endcomment %}
+<div class="cabecera-arbol">
+  <p class="titulo-menu">Carpetas</p>
+  <span class="contador">{{ biblioteca_total }}</span>
+</div>
+
+<nav class="lista-carpetas">
+  <a class="carpeta raiz {% if not carpeta_actual %}actual{% endif %}"
+     href="?{% consulta carpeta=None %}">
+    <i class="icono-carpeta" aria-hidden="true">🗄️</i>
+    <span class="nombre">Toda la biblioteca</span>
+    <em>{{ biblioteca_total }}</em>
+  </a>
+
+  {% for c in arbol_carpetas %}
+    <a class="carpeta {% if c.actual %}actual{% endif %} {% if c.abierta %}abierta{% endif %}"
+       style="padding-left:{{ c.nivel|sangria }}px"
+       href="?{% consulta carpeta=c.ruta %}" title="{{ c.ruta }}">
+      <i class="icono-carpeta" aria-hidden="true">{% if c.abierta and c.tiene_hijas %}📂{% else %}📁{% endif %}</i>
+      <span class="nombre">{{ c.nombre }}</span>
+      <em>{{ c.total }}</em>
+    </a>
+  {% empty %}
+    <p class="nada">La biblioteca no tiene carpetas: todo cuelga de la raíz.</p>
+  {% endfor %}
+</nav>

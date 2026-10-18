@@ -1,0 +1,24 @@
+{% load biblioteca_extras %}
+{% comment %}
+La barra del modo clásico: el camino de vuelta y poco más. Ocupa el sitio de la
+barra de filtros a propósito — y lleva su mismo id — para que el refresco por
+partes de la lista siga funcionando igual en los dos modos.
+{% endcomment %}
+<nav class="migas-carpeta" aria-label="Carpeta actual">
+  <a class="miga" href="?{% consulta carpeta=None %}">🗄️ Biblioteca</a>
+  {% for m in migas_carpeta %}
+    <span class="separador-miga" aria-hidden="true">›</span>
+    <a class="miga {% if forloop.last %}actual{% endif %}" href="?{% consulta carpeta=m.ruta %}">{{ m.nombre }}</a>
+  {% endfor %}
+</nav>
+
+{% if filtros.q %}
+  <a class="pastilla busqueda" href="?{% consulta q=None %}" title="Quitar la búsqueda">
+    «{{ filtros.q }}»<span class="quitar">×</span></a>
+{% endif %}
+
+<p class="recuento-filtros">
+  <strong>{{ pagina.paginator.count }}</strong> aquí
+  {% if carpeta_total != pagina.paginator.count %}<span class="sep">•</span>{{ carpeta_total }} en la rama{% endif %}
+  {% if duracion_ms is not None %}<span class="sep">•</span><span class="mono">{{ duracion_ms }}ms</span>{% endif %}
+</p>

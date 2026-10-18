@@ -1,18 +1,50 @@
 {% extends "biblioteca/base.html" %}
+{% load biblioteca_extras %}
 {% block titulo %}{{ filtros.q|default:"Biblioteca" }} · Alejandria{% endblock %}
-{% block cuerpo %}vista-biblioteca{% endblock %}
+{% block cuerpo %}vista-biblioteca nav-{{ navegacion }}{% endblock %}
+
+{% comment %}
+Dos formas de recorrer lo mismo, y el interruptor para cambiar:
+
+· «Alejandria» — filtros por etiqueta, corresponsal, tipo y año encima de la
+  lista. Es la forma de buscar sin saber dónde está algo.
+· «Clásico» — el árbol de carpetas del disco a la izquierda, al estilo de
+  DevonThink o del Finder. Es la forma de ir a donde ya sabes que está.
+
+Al pasar a clásico se sueltan los filtros y se conserva solo la carpeta: con
+una etiqueta puesta, una carpeta podría salir vacía sin que se entienda por qué.
+Al volver no se suelta nada, que los filtros son el modo de trabajar de allí.
+{% endcomment %}
+{% block interruptor_nav %}
+<div class="interruptor-nav" role="group" aria-label="Forma de navegar">
+  <a class="{% if navegacion == 'clasico' %}activo{% endif %}"
+     href="?{% consulta nav='clasico' etiqueta=None corresponsal=None tipo=None anio=None ext=None vista=None modo_etiquetas=None %}"
+     title="Navegar por las carpetas del disco, como en DevonThink">
+    <i aria-hidden="true">📂</i><span>Clásico</span></a>
+  <a class="{% if navegacion != 'clasico' %}activo{% endif %}"
+     href="?{% consulta nav='alejandria' %}"
+     title="Filtrar por etiquetas, corresponsal, tipo y año">
+    <i aria-hidden="true">🏷️</i><span>Alejandria</span></a>
+</div>
+{% endblock %}
 
 {% block contenido %}
-{% comment %}
-Dos paneles y una barra de filtros encima. Los filtros eran una tercera columna
-que se comía 250 px de ancho a todas horas; ahora son desplegables y el ancho
-se lo reparten la lista y la vista previa.
-{% endcomment %}
 <nav class="barra-filtros" id="barra-filtros">
-  {% include "biblioteca/partes/filtros.html" %}
+  {% if navegacion == 'clasico' %}
+    {% include "biblioteca/partes/migas.html" %}
+  {% else %}
+    {% include "biblioteca/partes/filtros.html" %}
+  {% endif %}
 </nav>
 
-<main class="dos-paneles" id="marco">
+<main class="paneles" id="marco">
+  {% if navegacion == 'clasico' %}
+    <aside class="panel arbol" id="arbol-carpetas">
+      {% include "biblioteca/partes/carpetas.html" %}
+    </aside>
+    <div class="tirador" data-tira="arbol" data-lado="izquierda" title="Arrastra para cambiar el ancho"></div>
+  {% endif %}
+
   <section class="panel central" id="central">
     {% include "biblioteca/partes/lista.html" %}
   </section>

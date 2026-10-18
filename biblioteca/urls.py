@@ -1,4 +1,6 @@
+from django.templatetags.static import static
 from django.urls import path
+from django.views.generic.base import RedirectView
 
 from . import vistas
 
@@ -23,4 +25,13 @@ urlpatterns = [
     path("estado/escanear/", vistas.escanear_ahora, name="escanear"),
     path("acceder/", vistas.acceder, name="acceder"),
     path("salir/", vistas.salir, name="salir"),
+
+    # El icono, también en la raíz: el navegador y el iPad lo piden ahí a pelo
+    # cuando guardan un marcador, sin mirar las etiquetas de la página.
+    path("favicon.ico", RedirectView.as_view(
+        url=static("biblioteca/favicon.ico"), permanent=True)),
+    path("apple-touch-icon.png", RedirectView.as_view(
+        url=static("biblioteca/icono-180.png"), permanent=True)),
+    path("apple-touch-icon-precomposed.png", RedirectView.as_view(
+        url=static("biblioteca/icono-180.png"), permanent=True)),
 ]

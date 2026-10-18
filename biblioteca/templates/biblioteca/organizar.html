@@ -39,7 +39,7 @@
             <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" onsubmit="return confirm('¿Borrar la etiqueta {{ e.nombre|escapejs }}?')">
               {% csrf_token %}<input type="hidden" name="que" value="etiqueta">
               <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ e.pk }}">
-              <button class="btn peligro mini">Borrar</button>
+              <button class="boton peligro pequeno">Borrar</button>
             </form>
           </td>
         </tr>
@@ -54,7 +54,7 @@
       </select>
       <input type="color" name="color" value="#8a8f98">
       <label class="interruptor"><input type="checkbox" name="inbox" value="1"> Buzón</label>
-      <button class="btn primario">Añadir</button>
+      <button class="boton principal">Añadir</button>
     </form>
   </section>
 
@@ -72,7 +72,7 @@
     <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
       {% csrf_token %}<input type="hidden" name="que" value="corresponsal">
       <input type="text" name="nombre" placeholder="Nuevo corresponsal" required>
-      <button class="btn primario">Añadir</button>
+      <button class="boton principal">Añadir</button>
     </form>
   </section>
 
@@ -90,7 +90,7 @@
     <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" class="linea">
       {% csrf_token %}<input type="hidden" name="que" value="tipo">
       <input type="text" name="nombre" placeholder="Nuevo tipo" required>
-      <button class="btn primario">Añadir</button>
+      <button class="boton principal">Añadir</button>
     </form>
   </section>
 
@@ -106,7 +106,7 @@
             <form method="post" action="{% url 'biblioteca:organizar_guardar' %}" onsubmit="return confirm('¿Borrar el campo y todos sus valores?')">
               {% csrf_token %}<input type="hidden" name="que" value="campo">
               <input type="hidden" name="accion" value="borrar"><input type="hidden" name="id" value="{{ c.pk }}">
-              <button class="btn peligro mini">Borrar</button>
+              <button class="boton peligro pequeno">Borrar</button>
             </form>
           </td>
         </tr>
@@ -118,7 +118,7 @@
       <input type="text" name="nombre" placeholder="Nombre del campo" required>
       <select name="tipo">{% for clave, etiqueta in tipos_campo %}<option value="{{ clave }}">{{ etiqueta }}</option>{% endfor %}</select>
       <input type="text" name="opciones" placeholder="Opciones separadas por comas (solo listas)">
-      <button class="btn primario">Añadir</button>
+      <button class="boton principal">Añadir</button>
     </form>
   </section>
 
@@ -140,7 +140,7 @@
       <input type="text" name="icono" value="🔎" size="2">
       <input type="text" name="nombre" placeholder="Nombre" required>
       <input type="text" name="consulta" placeholder="vista=&amp;etiqueta=3&amp;orden=fecha" required>
-      <button class="btn primario">Añadir</button>
+      <button class="boton principal">Añadir</button>
     </form>
   </section>
 </main>

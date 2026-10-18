@@ -7,6 +7,7 @@ framework de JavaScript, ni compilación, ni un solo megabyte de node_modules.
 import datetime as dt
 import logging
 import os
+import re
 import tempfile
 import zipfile
 import mimetypes
@@ -28,7 +29,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import busqueda, escaner, miniaturas, vista_previa
+from . import busqueda, carpetas as arbol_carpetas, escaner, miniaturas, vista_previa
 from .models import (
     BusquedaGuardada, CampoPersonalizado, Corresponsal, Documento, Etiqueta,
     Registro, TipoDocumento, ValorCampo,
@@ -227,11 +228,62 @@ def _filtros_activos(peticion):
     return activos
 
 
+# --- Navegación por carpetas (modo clásico) -----------------------------------
+NAVEGACIONES = ("alejandria", "clasico")
+
+
+def _navegacion(peticion):
+    """Cuál de los dos modos de navegar manda: el de siempre o el de carpetas.
+
+    Se elige con `?nav=` y se recuerda en una cookie, igual que la presentación
+    en lista o en rejilla: quien trabaja a carpetas no quiere volver a pulsarlo
+    en cada visita.
+    """
+    pedido = peticion.GET.get("nav") or peticion.COOKIES.get("nav")
+    return pedido if pedido in NAVEGACIONES else "alejandria"
+
+
+def _solo_de_esta_carpeta(qs, carpeta):
+    """Deja fuera lo que está en las subcarpetas: un navegador de archivos.
+
+    El filtro normal de carpeta incluye toda la rama (que es lo que se quiere al
+    filtrar), pero al navegar por carpetas se espera lo contrario: al entrar en
+    `Finanzas` salen sus papeles, no los de `Finanzas/Nominas`. Esos están un
+    clic más adentro.
+    """
+    if carpeta:
+        return qs.exclude(ruta__regex=rf"^{re.escape(carpeta)}/.*/")
+    return qs.exclude(ruta__contains="/")
+
+
+def contexto_carpetas(carpeta, carpetas_disco):
+    """El árbol, las subcarpetas y las migas de pan del modo clásico.
+
+    `carpetas_disco` viene ya calculado del contexto lateral: recorrer la
+    biblioteca entera dos veces en la misma petición es justo lo que no hay que
+    hacerle a un NAS.
+    """
+    rutas = Documento.objects.visibles().values_list("ruta", flat=True)
+    mapa = arbol_carpetas.armar(rutas, carpetas_disco)
+    return {
+        "arbol_carpetas": arbol_carpetas.ramas(mapa, carpeta),
+        "subcarpetas": arbol_carpetas.subcarpetas(mapa, carpeta),
+        "migas_carpeta": arbol_carpetas.migas(carpeta),
+        "carpeta_actual": carpeta,
+        "carpeta_nombre": carpeta.rsplit("/", 1)[-1],
+        "carpeta_total": mapa["total"].get(carpeta, 0),
+        "biblioteca_total": mapa["total"].get("", 0),
+    }
+
+
 # --- Listado ------------------------------------------------------------------
 @acceso
 def biblioteca(peticion):
     inicio = time.perf_counter()
     qs, filtros = filtrar(peticion)
+    navegacion = _navegacion(peticion)
+    if navegacion == "clasico":
+        qs = _solo_de_esta_carpeta(qs, filtros["carpeta"])
     paginador = Paginator(qs, settings.PAGINADO)
     pagina = paginador.get_page(peticion.GET.get("pagina"))
     pagina.object_list = list(pagina.object_list)  # que la consulta cuente en el tiempo
@@ -250,10 +302,13 @@ def biblioteca(peticion):
         "ordenes": ORDENES,
         "actual": actual,
         "presentacion": peticion.GET.get("modo", peticion.COOKIES.get("modo", "lista")),
+        "navegacion": navegacion,
         "consulta": consulta_actual(peticion),
         "duracion_ms": duracion_ms,
         **contexto_lateral(peticion),
     }
+    if navegacion == "clasico":
+        contexto.update(contexto_carpetas(filtros["carpeta"], contexto["carpetas"]))
     if actual is not None:
         contexto.update(_contexto_documento(actual))
 
@@ -265,6 +320,8 @@ def biblioteca(peticion):
     respuesta = render(peticion, "biblioteca/biblioteca.html", contexto)
     if peticion.GET.get("modo"):
         respuesta.set_cookie("modo", contexto["presentacion"], max_age=60 * 60 * 24 * 365)
+    if peticion.GET.get("nav"):
+        respuesta.set_cookie("nav", navegacion, max_age=60 * 60 * 24 * 365)
     return respuesta
 
 

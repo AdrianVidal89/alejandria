@@ -37,7 +37,8 @@
   const apuntar = (clave, valor) => {
     try { localStorage.setItem(clave, valor); } catch (_) { /* modo privado */ }
   };
-  ["detalle"].forEach((cual) => {
+  const LIMITES = { detalle: [340, 0.68], arbol: [170, 0.34] };
+  ["detalle", "arbol"].forEach((cual) => {
     const guardado = leer(claveAncho(cual));
     if (guardado) raiz.style.setProperty(`--${cual}`, guardado);
   });
@@ -45,12 +46,16 @@
     tirador.addEventListener("mousedown", (e) => {
       e.preventDefault();
       const cual = tirador.dataset.tira;
+      const izquierda = tirador.dataset.lado === "izquierda";
+      const [minimo, proporcion] = LIMITES[cual] || LIMITES.detalle;
       const inicio = e.clientX;
       const ancho = parseInt(getComputedStyle(raiz).getPropertyValue(`--${cual}`), 10);
       const mover = (ev) => {
-        const delta = inicio - ev.clientX;
-        const tope = Math.max(360, Math.round(window.innerWidth * 0.68));
-        const valor = Math.min(tope, Math.max(340, ancho + delta));
+        // El panel de la ficha se ensancha al arrastrar hacia la izquierda; el
+        // árbol de carpetas, al revés.
+        const delta = izquierda ? ev.clientX - inicio : inicio - ev.clientX;
+        const tope = Math.max(minimo, Math.round(window.innerWidth * proporcion));
+        const valor = Math.min(tope, Math.max(minimo, ancho + delta));
         raiz.style.setProperty(`--${cual}`, valor + "px");
       };
       const soltar = () => {
@@ -140,13 +145,15 @@
     if (abierto) destino.searchParams.set("doc", abierto);
 
     const indice = desplegables().findIndex((d) => d.open);
-    const menu = indice >= 0 ? $(".menu", desplegables()[indice]) : null;
+    const menu = indice >= 0 ? $(".menu-filtro", desplegables()[indice]) : null;
     const recuerdo = {
       scroll: menu ? $$(".lista-facetas", menu).map((l) => l.scrollTop) : [],
       texto: menu && $(".filtro-lista", menu) ? $(".filtro-lista", menu).value : "",
     };
     const barra = $("#barra-filtros");
     const central = $("#central");
+    const arbol = $("#arbol-carpetas");
+    recuerdo.arbol = arbol ? arbol.scrollTop : 0;
     barra.classList.add("cargando");
 
     if (filtroEnCurso) filtroEnCurso.abort();
@@ -163,6 +170,11 @@
         if (!barraNueva || !centralNuevo) throw new Error("sin partes");
         barra.innerHTML = barraNueva.innerHTML;
         central.innerHTML = centralNuevo.innerHTML;
+        const arbolNuevo = $("#arbol-carpetas", nuevo);
+        if (arbol && arbolNuevo) {
+          arbol.innerHTML = arbolNuevo.innerHTML;
+          arbol.scrollTop = recuerdo.arbol;
+        }
         document.title = nuevo.title;
         history.replaceState(null, "", destino);
         sincronizarBuscador(destino);
@@ -189,7 +201,7 @@
   }
 
   document.addEventListener("click", (e) => {
-    const enlace = e.target.closest(".barra-filtros .menu a, .barra-filtros .pastillas a");
+    const enlace = e.target.closest(".barra-filtros .menu-filtro a, .barra-filtros .pastillas a, #arbol-carpetas a, .carpetas-hijas a");
     if (!enlace || e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
     const url = new URL(enlace.href, location.href);
     // Solo lo que se queda en la biblioteca: «editar» lleva a Organizar.

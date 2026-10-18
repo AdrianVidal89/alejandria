@@ -15,7 +15,7 @@ ancho a los documentos y a la vista previa.
       <span class="contador">{% if filtros.vista == 'por_revisar' %}{{ totales.por_revisar }}{% elif filtros.vista == 'favoritos' %}{{ totales.favoritos }}{% elif filtros.vista == 'sin_clasificar' %}{{ totales.sin_clasificar }}{% elif filtros.vista == 'problemas' %}{{ totales.problemas }}{% elif filtros.vista == 'papelera' %}{{ totales.papelera }}{% else %}{{ totales.todos }}{% endif %}</span>
       <i class="flecha" aria-hidden="true"></i>
     </summary>
-    <div class="menu">
+    <div class="menu-filtro">
       <p class="titulo-menu">Colecciones</p>
       <a class="opcion {% if not filtros.vista %}activa{% endif %}" href="?{% consulta vista=None %}">
         <span>Todos</span><em>{{ totales.todos }}</em></a>
@@ -61,13 +61,13 @@ ancho a los documentos y a la vista previa.
   {# --- Etiquetas ------------------------------------------------------------ #}
   <details class="desplegable" id="desplegable-etiquetas">
     <summary class="selector-filtro {% if resumen.etiqueta %}puesto{% endif %}">
-      <i class="punto" style="background:{% if resumen.etiqueta %}var(--exito){% else %}var(--texto-suave){% endif %}"></i>
+      <i class="punto" style="background:{% if resumen.etiqueta %}var(--ok){% else %}var(--suave){% endif %}"></i>
       <span class="nombre-filtro">Etiquetas:</span>
       <strong>{{ resumen.etiqueta|resumen_nombres:"Todas" }}</strong>
       {% if resumen.etiqueta %}<span class="contador">{{ resumen.etiqueta|length }}</span>{% endif %}
       <i class="flecha" aria-hidden="true"></i>
     </summary>
-    <div class="menu ancho">
+    <div class="menu-filtro ancho">
       <div class="cabecera-menu">
         <p class="titulo-menu">Etiquetas</p>
         <a class="mini" href="{% url 'biblioteca:organizar' %}#etiquetas">editar</a>
@@ -114,7 +114,7 @@ ancho a los documentos y a la vista previa.
       <span class="contador">{{ corresponsales|length }}</span>
       <i class="flecha" aria-hidden="true"></i>
     </summary>
-    <div class="menu">
+    <div class="menu-filtro">
       <p class="titulo-menu">Corresponsales</p>
       {% if corresponsales|length > 8 %}
         <input type="search" class="filtro-lista" placeholder="Filtrar corresponsales…"
@@ -138,7 +138,7 @@ ancho a los documentos y a la vista previa.
       <span class="contador">{{ tipos|length }}</span>
       <i class="flecha" aria-hidden="true"></i>
     </summary>
-    <div class="menu">
+    <div class="menu-filtro">
       <p class="titulo-menu">Tipos de documento</p>
       <div class="lista-facetas">
       {% for t in tipos %}
@@ -157,7 +157,7 @@ ancho a los documentos y a la vista previa.
       <strong>{{ resumen.anio|resumen_nombres:"Todos" }}</strong>
       <i class="flecha" aria-hidden="true"></i>
     </summary>
-    <div class="menu">
+    <div class="menu-filtro">
       <p class="titulo-menu">Años</p>
       <div class="anios">
       {% for a in anios %}

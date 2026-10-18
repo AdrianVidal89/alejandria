@@ -1,0 +1,17 @@
+{% load biblioteca_extras %}
+{% comment %}
+Las carpetas que cuelgan de esta, listadas encima de los documentos como en
+cualquier navegador de archivos. Entrar en una es cambiar de carpeta, no
+filtrar: lo que haya dentro se verá al entrar.
+{% endcomment %}
+{% if subcarpetas %}
+<div class="carpetas-hijas">
+  {% for c in subcarpetas %}
+    <a class="carpeta-hija" href="?{% consulta carpeta=c.ruta %}" title="{{ c.ruta }}">
+      <i aria-hidden="true">📁</i>
+      <span class="nombre">{{ c.nombre }}</span>
+      <em>{{ c.total }} doc{{ c.total|pluralize:"s" }}{% if c.subcarpetas %} · {{ c.subcarpetas }} carpeta{{ c.subcarpetas|pluralize:"s" }}{% endif %}</em>
+    </a>
+  {% endfor %}
+</div>
+{% endif %}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Versión «maskable» para Android: el sistema recorta el icono con la forma
+       que quiera, así que la marca va metida al 72 % y el fondo llena todo. -->
+  <rect width="64" height="64" fill="#966a33"/>
+  <g fill="#f7efe3" transform="translate(32 32) scale(0.68) translate(-32 -32)">
+    <path d="M32 10.5 55 26.2a1.6 1.6 0 0 1-.9 2.9H9.9a1.6 1.6 0 0 1-.9-2.9z"/>
+    <rect x="13.5" y="33" width="9" height="19" rx="2.2"/>
+    <rect x="27.5" y="33" width="9" height="19" rx="2.2"/>
+    <rect x="41.5" y="33" width="9" height="19" rx="2.2"/>
+    <rect x="9" y="54.5" width="46" height="5" rx="2.2"/>
+  </g>
+</svg>

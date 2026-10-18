@@ -17,13 +17,13 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
   </div>
 
   <div class="detalle-botones">
-    <a class="btn" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">
+    <a class="boton" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
       Abrir</a>
-    <a class="btn" href="{% url 'biblioteca:descargar' doc.pk %}">
+    <a class="boton" href="{% url 'biblioteca:descargar' doc.pk %}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
       Descargar</a>
-    <button type="button" class="btn estrecho" id="boton-mover"
+    <button type="button" class="boton estrecho" id="boton-mover"
             title="Llevar el fichero a otra carpeta de la biblioteca">Mover…</button>
   </div>
 
@@ -35,8 +35,8 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
              placeholder="Vacío = la raíz de la biblioteca" autocomplete="off">
     </label>
     <div class="linea">
-      <button class="btn primario mini">Mover</button>
-      <button type="button" class="btn mini" id="boton-mover-cancelar">Cancelar</button>
+      <button class="boton principal pequeno">Mover</button>
+      <button type="button" class="boton pequeno" id="boton-mover-cancelar">Cancelar</button>
     </div>
     <p class="nada">Se mueve el fichero de verdad. La ficha no se toca: conserva
        etiquetas, campos, notas y fecha.</p>
@@ -48,7 +48,7 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
   {% if doc.por_revisar %}
     <div class="pendiente" id="aviso-pendiente">
       <span>📥 Recién llegado · sin catalogar</span>
-      <button type="button" class="btn mini" id="boton-catalogado"
+      <button type="button" class="boton pequeno" id="boton-catalogado"
               title="Sácalo de «Recién llegados» sin tocar nada más">Ya está</button>
     </div>
   {% endif %}
@@ -201,7 +201,7 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
     </div>
     <p class="nada" id="campos-vacio" {% if campos_usados %}hidden{% endif %}>Ninguno todavía.</p>
 
-    <button type="button" class="btn mini" id="boton-anadir-campo">+ Seleccionar y añadir</button>
+    <button type="button" class="boton pequeno" id="boton-anadir-campo">+ Seleccionar y añadir</button>
 
     <div id="anadir-campo" hidden>
       {% if campos_disponibles %}
@@ -218,12 +218,12 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
           {% endfor %}
         </div>
         <div class="botonera-campos">
-          <button type="button" class="btn mini primario" id="boton-confirmar-campos">Añadir</button>
-          <button type="button" class="btn mini" id="boton-campo-nuevo">Crear uno nuevo…</button>
+          <button type="button" class="boton pequeno principal" id="boton-confirmar-campos">Añadir</button>
+          <button type="button" class="boton pequeno" id="boton-campo-nuevo">Crear uno nuevo…</button>
         </div>
       {% else %}
         <p class="nada">Todos los campos de la biblioteca ya están en esta ficha.</p>
-        <button type="button" class="btn mini" id="boton-campo-nuevo">Crear uno nuevo…</button>
+        <button type="button" class="boton pequeno" id="boton-campo-nuevo">Crear uno nuevo…</button>
       {% endif %}
 
       <div id="campo-nuevo" hidden>
@@ -247,7 +247,7 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
   </label>
 
   <div class="pie-ficha">
-    <button class="btn primario" type="submit">Guardar cambios</button>
+    <button class="boton principal" type="submit">Guardar cambios</button>
     <span class="nada atajo"><kbd>Ctrl</kbd> + <kbd>S</kbd></span>
   </div>
 

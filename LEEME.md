@@ -33,12 +33,22 @@ contenedores, con un consumo real en reposo de 200-230 MB.
 
 ## Qué hace
 
-- Biblioteca en dos paneles con los filtros en una barra de desplegables encima
-  (colección, etiquetas, corresponsal, tipo y año): la lista o las miniaturas a
-  la izquierda y la ficha con su vista previa a la derecha, con el ancho
-  ajustable. Tema oscuro al estilo *Tron: Legacy* (negro, rejilla, cian de
-  neón con brillo y naranja para avisos, letra Orbitron servida desde la propia
-  aplicación) y un tema claro sobrio.
+- **Dos formas de recorrer lo mismo, con un interruptor en la cabecera:**
+  - *Alejandria* — los filtros en una barra de desplegables encima de la lista
+    (colección, etiquetas, corresponsal, tipo y año). Para buscar sin saber
+    dónde está algo.
+  - *Clásico* — el árbol de carpetas del disco a la izquierda, al estilo de
+    DevonThink o del Finder: migas de pan, las subcarpetas listadas encima de
+    los documentos y solo los papeles que cuelgan de la carpeta en la que estás.
+    Para ir a donde ya sabes que está. La elección se recuerda.
+- Biblioteca en paneles: carpetas o filtros, la lista o las miniaturas, y la
+  ficha con su vista previa a la derecha, todos con el ancho ajustable.
+- Aspecto común a las aplicaciones de Adrian: base neutra en gris pizarra con el
+  cuero como único acento, claro y oscuro siguiendo al sistema (o forzado con el
+  interruptor), densidad amplia y navegación abajo en el móvil.
+- Icono propio en la pestaña del navegador y al guardarla en la pantalla de
+  inicio del iPad o del iPhone (manifiesto incluido: se abre a pantalla completa,
+  sin barras del navegador).
 - Vista previa de PDF, imágenes, **Word (.docx y .doc)**, **Markdown** y texto
   plano. Word y Markdown se traducen a HTML en el servidor con la librería
   estándar (sin dependencias nuevas) y se enseñan en un marco aislado, sin

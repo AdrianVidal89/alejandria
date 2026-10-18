@@ -20,7 +20,7 @@
        No toca, mueve ni borra ningún fichero tuyo.</p>
     <form method="post" action="{% url 'biblioteca:escanear' %}">
       {% csrf_token %}
-      <button class="btn primario" {% if escaneo.corriendo %}disabled{% endif %}>
+      <button class="boton principal" {% if escaneo.corriendo %}disabled{% endif %}>
         {% if escaneo.corriendo %}Escaneando…{% else %}Escanear ahora{% endif %}
       </button>
       <label class="interruptor"><input type="checkbox" name="rehashear" value="1"> Recalcular huellas de todo (más lento)</label>

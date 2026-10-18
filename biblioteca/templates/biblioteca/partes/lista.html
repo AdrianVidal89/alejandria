@@ -1,7 +1,7 @@
 {% load biblioteca_extras %}
 <div class="cabecera-lista">
   <div class="migas">
-    <h2>Resultados</h2>
+    <h2>{% if navegacion == 'clasico' %}{{ carpeta_nombre|default:"Biblioteca" }}{% else %}Resultados{% endif %}</h2>
     <span class="contador-resultados">{{ pagina.paginator.count }} documento{{ pagina.paginator.count|pluralize:"s" }}</span>
     {% if filtros.q %}<span class="chip busqueda">“{{ filtros.q }}” <a href="?{% consulta q=None %}" title="Quitar la búsqueda">×</a></span>{% endif %}
   </div>
@@ -32,7 +32,7 @@
 
 {% if not pagina.paginator.count and filtros.modo_etiquetas == 'y' and filtros.etiquetas_sel|length > 1 %}
   <p class="consejo">Ningún documento tiene a la vez todas las etiquetas elegidas.
-     <a class="btn mini" href="?{% consulta modo_etiquetas=None %}">Buscar cualquiera de ellas</a></p>
+     <a class="boton pequeno" href="?{% consulta modo_etiquetas=None %}">Buscar cualquiera de ellas</a></p>
 {% endif %}
 
 <div class="acciones-seleccion" id="acciones-seleccion" hidden>
@@ -44,34 +44,36 @@
       <option value="">— etiqueta —</option>
       {% for e in arbol %}<option value="{{ e.pk }}">{{ e.ruta_nombre }}</option>{% endfor %}
     </select>
-    <button class="btn" name="accion" value="etiquetar">Etiquetar</button>
-    <button class="btn" name="accion" value="desetiquetar">Quitar</button>
+    <button class="boton" name="accion" value="etiquetar">Etiquetar</button>
+    <button class="boton" name="accion" value="desetiquetar">Quitar</button>
     <select name="corresponsal">
       <option value="">— corresponsal —</option>
       {% for c in corresponsales %}<option value="{{ c.pk }}">{{ c.nombre }}</option>{% endfor %}
     </select>
-    <button class="btn" name="accion" value="corresponsal">Asignar</button>
+    <button class="boton" name="accion" value="corresponsal">Asignar</button>
     <input type="text" name="carpeta" list="carpetas-lista" placeholder="carpeta destino"
            autocomplete="off" size="16">
     <datalist id="carpetas-lista">
       {% for c in carpetas %}<option value="{{ c }}">{% endfor %}
     </datalist>
-    <button class="btn" name="accion" value="mover"
+    <button class="boton" name="accion" value="mover"
             title="Lleva los ficheros a esa carpeta de la biblioteca">Mover</button>
-    <button class="btn" type="button" id="boton-descargar-varios" data-url="{% url 'biblioteca:descargar_varios' %}"
+    <button class="boton" type="button" id="boton-descargar-varios" data-url="{% url 'biblioteca:descargar_varios' %}"
             title="Un zip con los documentos seleccionados">⬇ Descargar</button>
     {% if filtros.vista == 'papelera' %}
-      <button class="btn" name="accion" value="restaurar">Restaurar</button>
-      <button class="btn peligro" name="accion" value="borrar_definitivo"
+      <button class="boton" name="accion" value="restaurar">Restaurar</button>
+      <button class="boton peligro" name="accion" value="borrar_definitivo"
               onclick="return confirm('Quita la ficha de Alejandria. El fichero del disco NO se toca. ¿Seguir?')">Quitar ficha</button>
     {% else %}
       {% if filtros.vista == 'por_revisar' %}
-        <button class="btn" name="accion" value="revisado">Marcar catalogados</button>
+        <button class="boton" name="accion" value="revisado">Marcar catalogados</button>
       {% endif %}
-      <button class="btn" name="accion" value="papelera">A la papelera</button>
+      <button class="boton" name="accion" value="papelera">A la papelera</button>
     {% endif %}
   </form>
 </div>
+
+{% if navegacion == 'clasico' %}{% include "biblioteca/partes/subcarpetas.html" %}{% endif %}
 
 {% if presentacion == 'rejilla' %}
 <div class="rejilla" id="documentos">
@@ -88,7 +90,7 @@
     <p class="etiquetas">{% for e in d.etiquetas.all %}<span class="etq" style="--c:{{ e.color }}">{{ e.nombre }}</span>{% endfor %}</p>
   </article>
   {% empty %}
-  <p class="nada grande">Nada por aquí. Prueba a cambiar los filtros o a escanear la biblioteca.</p>
+  <p class="nada grande">{% if navegacion == 'clasico' %}Esta carpeta no tiene documentos sueltos{% if subcarpetas %}: lo que hay está en las carpetas de arriba{% endif %}.{% else %}Nada por aquí. Prueba a cambiar los filtros o a escanear la biblioteca.{% endif %}</p>
   {% endfor %}
 </div>
 {% else %}
@@ -125,7 +127,7 @@
       <td class="col-tam">{{ d.tamano_legible }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="8"><p class="nada grande">Nada por aquí. Cambia los filtros o escanea la biblioteca desde <a href="{% url 'biblioteca:estado' %}">Estado</a>.</p></td></tr>
+    <tr><td colspan="8"><p class="nada grande">{% if navegacion == 'clasico' %}Esta carpeta no tiene documentos sueltos{% if subcarpetas %}: lo que hay está en las carpetas de arriba{% endif %}.{% else %}Nada por aquí. Cambia los filtros o escanea la biblioteca desde <a href="{% url 'biblioteca:estado' %}">Estado</a>.{% endif %}</p></td></tr>
   {% endfor %}
   </tbody>
 </table>
@@ -133,8 +135,8 @@
 
 {% if pagina.paginator.num_pages > 1 %}
 <nav class="paginacion">
-  {% if pagina.has_previous %}<a class="btn" href="?{% consulta %}&pagina={{ pagina.previous_page_number }}">‹ Anterior</a>{% endif %}
+  {% if pagina.has_previous %}<a class="boton" href="?{% consulta %}&pagina={{ pagina.previous_page_number }}">‹ Anterior</a>{% endif %}
   <span>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</span>
-  {% if pagina.has_next %}<a class="btn" href="?{% consulta %}&pagina={{ pagina.next_page_number }}">Siguiente ›</a>{% endif %}
+  {% if pagina.has_next %}<a class="boton" href="?{% consulta %}&pagina={{ pagina.next_page_number }}">Siguiente ›</a>{% endif %}
 </nav>
 {% endif %}
