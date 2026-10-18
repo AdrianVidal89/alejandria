@@ -95,6 +95,7 @@
 </div>
 {% else %}
 <table class="tabla" id="documentos">
+  {% if pagina.paginator.count %}
   <thead>
     <tr>
       <th class="col-chk"><input type="checkbox" id="chk-todos"></th>
@@ -107,6 +108,7 @@
       <th class="col-tam">Tamaño</th>
     </tr>
   </thead>
+  {% endif %}
   <tbody>
   {% for d in pagina %}
     <tr class="{% if actual and d.pk == actual.pk %}activa{% endif %} {% if not d.existe %}rota{% endif %}"

@@ -282,7 +282,9 @@ def biblioteca(peticion):
     inicio = time.perf_counter()
     qs, filtros = filtrar(peticion)
     navegacion = _navegacion(peticion)
-    if navegacion == "clasico":
+    # Al buscar no se recorta a la carpeta: se busca en toda su rama, como en el
+    # Finder. Recortar dejaría búsquedas vacías sin que se entienda por qué.
+    if navegacion == "clasico" and not filtros["q"]:
         qs = _solo_de_esta_carpeta(qs, filtros["carpeta"])
     paginador = Paginator(qs, settings.PAGINADO)
     pagina = paginador.get_page(peticion.GET.get("pagina"))
