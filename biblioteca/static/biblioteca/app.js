@@ -233,6 +233,7 @@
       .then((html) => {
         detalle.innerHTML = html;
         detalle.scrollTop = 0;
+        if (window.Visor) window.Visor.enganchar(detalle);
         engancharFicha();
       })
       .catch(() => {});
@@ -253,7 +254,7 @@
     });
     central.addEventListener("dblclick", (e) => {
       const fila = e.target.closest("#documentos [data-id]");
-      if (fila) window.open(`/doc/${fila.dataset.id}/fichero/`, "_blank");
+      if (fila) location.href = `/doc/${fila.dataset.id}/ver/`;
     });
   }
 
@@ -292,7 +293,7 @@
       anterior.scrollIntoView({ block: "nearest" });
       abrir(anterior);
     } else if (e.key === "Enter" && actual >= 0) {
-      window.open(`/doc/${lista[actual].dataset.id}/fichero/`, "_blank");
+      location.href = `/doc/${lista[actual].dataset.id}/ver/`;
     }
   });
 
@@ -473,6 +474,7 @@
     const viejas = $$(":scope > [data-parte]", detalle);
     if (!partes.length || partes.length !== viejas.length) {
       detalle.innerHTML = html;  // estructura distinta: se pinta entera
+      if (window.Visor) window.Visor.enganchar(detalle);
       return;
     }
     partes.forEach((parte) => {

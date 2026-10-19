@@ -902,8 +902,60 @@ input[type=checkbox] { accent-color: var(--acento); width: 17px; height: 17px; c
   background: var(--marco-vista);
 }
 .previsualizacion iframe { width: 100%; height: clamp(360px, 52vh, 760px); border: 0; display: block; background: var(--marco-vista); }
-.previsualizacion.imagen { padding: 14px; }
-.previsualizacion img { width: 100%; display: block; border-radius: 8px; }
+
+/* Visor de PDF e imágenes (visor.js). El zoom es propio: `touch-action` deja
+   que el dedo desplace dentro del visor pero no que amplíe la página entera,
+   que es lo que pasaba en el iPhone. */
+.visor { position: relative; background: var(--marco-vista); }
+.visor-lienzo {
+  height: clamp(360px, 58vh, 820px); overflow: auto; overscroll-behavior: contain;
+  touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; outline: none;
+}
+.visor-hojas {
+  --ancho-hoja: 100%;
+  display: grid; justify-items: center; align-content: start; gap: 12px;
+  width: max-content; min-width: 100%; box-sizing: border-box; padding: 12px;
+}
+.visor-hoja {
+  width: var(--ancho-hoja); aspect-ratio: 3 / 4; background: #fff; position: relative;
+  box-shadow: 0 1px 2px rgba(0,0,0,.18), 0 4px 14px rgba(0,0,0,.12);
+}
+.visor[data-tipo="imagen"] .visor-hoja { background: none; box-shadow: none; }
+.visor-hoja canvas, .visor-hoja img {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.visor-aviso { width: min(100%, 420px); text-align: center; color: var(--suave); padding: 40px 10px; margin: 0; }
+.visor-mandos {
+  position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center;
+  background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
+  border: 1px solid var(--borde); border-radius: var(--pastilla); box-shadow: var(--sombra, 0 2px 10px rgba(0,0,0,.18));
+  overflow: hidden;
+}
+.visor-mandos button {
+  border: 0; background: none; color: var(--texto); font: inherit; cursor: pointer;
+  min-width: 42px; height: 40px; font-size: 1.2rem; line-height: 1;
+}
+.visor-mandos button:hover { background: var(--acento-flojo); }
+.visor-mandos .visor-nivel { font: .78rem var(--mono); min-width: 58px; color: var(--suave); }
+
+/* La página de «Abrir»: barra con Volver y el documento en todo lo demás. */
+body.pagina-ver { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; padding: 0; margin: 0; }
+.barra-ver {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 14px) 10px calc(env(safe-area-inset-left) + 14px);
+  background: var(--panel); border-bottom: 1px solid var(--borde);
+}
+.titulos-ver { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.titulos-ver strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.titulos-ver small { color: var(--suave); font: .74rem var(--mono); }
+.cuerpo-ver { flex: 1 1 auto; min-height: 0; max-width: none; width: 100%; margin: 0; padding: 0; display: flex; flex-direction: column; background: var(--marco-vista); }
+.cuerpo-ver .visor { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.cuerpo-ver .visor-lienzo { flex: 1 1 auto; height: auto; }
+.cuerpo-ver .visor-mandos { bottom: calc(env(safe-area-inset-bottom) + 14px); right: calc(env(safe-area-inset-right) + 14px); }
+.marco-ver { flex: 1 1 auto; width: 100%; border: 0; display: block; }
+.cuerpo-ver .sin-vista { margin: auto; }
+@media (max-width: 560px) { .barra-ver .solo-ancho { display: none; } }
 .sin-vista { padding: 26px 18px; text-align: center; color: var(--suave); }
 .sin-vista p { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .miniatura-grande { max-width: 170px !important; margin: 0 auto 12px; border: 1px solid var(--borde); border-radius: 8px; }

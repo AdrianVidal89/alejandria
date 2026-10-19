@@ -623,6 +623,19 @@ def fichero(peticion, pk, adjunto=False):
 
 
 @acceso
+def ver(peticion, pk):
+    """El documento a pantalla completa, con un botón para volver.
+
+    «Abrir» antes llevaba al fichero tal cual, y en la aplicación instalada
+    (Chrome, la pantalla de inicio del iPhone) no hay botón de atrás: había que
+    cerrarla entera. Esta página sí lo tiene.
+    """
+    doc = get_object_or_404(Documento, pk=pk)
+    Documento.objects.filter(pk=pk).update(abierto=timezone.now())
+    return render(peticion, "biblioteca/ver.html", {"doc": doc, "grande": True})
+
+
+@acceso
 def vista(peticion, pk):
     """Word, Markdown y texto traducidos a HTML para la vista previa.
 

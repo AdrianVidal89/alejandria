@@ -1,0 +1,26 @@
+{% load static %}
+{% comment %}
+Visor de PDF e imágenes con zoom propio (botones, pellizco, doble toque y
+Ctrl + rueda). El PDF lo pinta PDF.js, servido desde la propia aplicación: el
+visor de PDF del navegador dentro de un iframe en el iPhone sale como una foto
+fija de la primera página, enorme y sin zoom. Lo mueve visor.js.
+{% endcomment %}
+<div class="visor{% if grande %} grande{% endif %}" data-tipo="{% if doc.es_pdf %}pdf{% else %}imagen{% endif %}"
+     {% if doc.es_pdf %}data-src="{% url 'biblioteca:fichero' doc.pk %}"
+     data-pdfjs="{% static 'biblioteca/pdfjs/pdf.min.mjs' %}"
+     data-worker="{% static 'biblioteca/pdfjs/pdf.worker.min.mjs' %}"{% endif %}>
+  <div class="visor-lienzo" tabindex="0" aria-label="Vista previa: pellizca o usa + y − para el zoom">
+    <div class="visor-hojas">
+      {% if doc.es_imagen %}
+        <div class="visor-hoja"><img src="{% url 'biblioteca:fichero' doc.pk %}" alt="{{ doc.titulo }}" draggable="false"></div>
+      {% else %}
+        <p class="visor-aviso">Cargando…</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="visor-mandos" role="toolbar" aria-label="Zoom">
+    <button type="button" data-zoom="menos" title="Alejar" aria-label="Alejar">−</button>
+    <button type="button" data-zoom="ajustar" class="visor-nivel" title="Ajustar al ancho">100%</button>
+    <button type="button" data-zoom="mas" title="Acercar" aria-label="Acercar">+</button>
+  </div>
+</div>

@@ -17,7 +17,7 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
   </div>
 
   <div class="detalle-botones">
-    <a class="boton" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener">
+    <a class="boton" href="{% url 'biblioteca:ver' doc.pk %}" title="Verlo a pantalla completa">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
       Abrir</a>
     <a class="boton" href="{% url 'biblioteca:descargar' doc.pk %}">
@@ -67,11 +67,9 @@ cabecera y la ficha: la vista previa se queda como está, sin recargar el PDF.
     </p>
     <span class="insignia-formato">{{ doc.extension|upper|default:"?" }} · {{ doc.tamano_legible }}</span>
   </div>
-  <div class="previsualizacion {% if doc.es_imagen %}imagen{% endif %}">
-    {% if doc.es_pdf and doc.existe %}
-      <iframe src="{% url 'biblioteca:fichero' doc.pk %}#view=FitH&toolbar=0" title="Vista previa" loading="lazy"></iframe>
-    {% elif doc.es_imagen and doc.existe %}
-      <img src="{% url 'biblioteca:fichero' doc.pk %}" alt="{{ doc.titulo }}">
+  <div class="previsualizacion">
+    {% if doc.existe and doc.es_pdf or doc.existe and doc.es_imagen %}
+      {% include "biblioteca/partes/visor.html" %}
     {% elif doc.vista_convertida and doc.existe %}
       <iframe src="{% url 'biblioteca:vista' doc.pk %}" title="Vista previa" loading="lazy"
               sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>

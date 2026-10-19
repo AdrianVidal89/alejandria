@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+<html lang="es" data-tema="{{ request.COOKIES.tema|default:'auto' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ doc.titulo }} · Alejandria</title>
+  <link rel="icon" href="{% static 'biblioteca/icono.svg' %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'biblioteca/icono-180.png' %}">
+  <link rel="manifest" href="{% static 'biblioteca/manifest.json' %}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f4f5f6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111315" media="(prefers-color-scheme: dark)">
+  <link rel="stylesheet" href="{% static 'biblioteca/app.css' %}">
+</head>
+<body class="pagina-ver">
+{% comment %}
+Lo que abre «Abrir»: el documento a pantalla completa, con una barra arriba
+para volver. En la aplicación instalada no hay botón de atrás del navegador.
+{% endcomment %}
+<header class="barra-ver">
+  <a class="boton" id="volver-visor" href="{% url 'biblioteca:biblioteca' %}?doc={{ doc.pk }}">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    Volver</a>
+  <div class="titulos-ver">
+    <strong title="{{ doc.titulo }}">{{ doc.titulo }}</strong>
+    <small>{{ doc.extension|upper }} · {{ doc.tamano_legible }}</small>
+  </div>
+  <a class="boton solo-ancho" href="{% url 'biblioteca:fichero' doc.pk %}" target="_blank" rel="noopener"
+     title="El fichero tal cual, en una pestaña nueva (para imprimir, por ejemplo)">Original</a>
+  <a class="boton" href="{% url 'biblioteca:descargar' doc.pk %}" title="Descargar" aria-label="Descargar">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+    <span class="solo-ancho">Descargar</span></a>
+</header>
+
+<main class="cuerpo-ver">
+  {% if not doc.existe %}
+    <div class="sin-vista"><p class="nada">⚠ El fichero no está en la carpeta.</p></div>
+  {% elif doc.es_pdf or doc.es_imagen %}
+    {% include "biblioteca/partes/visor.html" %}
+  {% elif doc.vista_convertida %}
+    <iframe class="marco-ver" src="{% url 'biblioteca:vista' doc.pk %}" title="{{ doc.titulo }}"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+  {% else %}
+    <div class="sin-vista">
+      <img src="{% url 'biblioteca:miniatura' doc.pk %}" alt="" class="miniatura-grande">
+      <p><span class="formato f-{{ doc.familia }}">{{ doc.formato_corto }}</span> {{ doc.tamano_legible }}</p>
+      <p class="nada">Este formato no se puede ver aquí. Descárgalo para abrirlo con su programa.</p>
+      <p><a class="boton principal" href="{% url 'biblioteca:descargar' doc.pk %}">Descargar</a></p>
+    </div>
+  {% endif %}
+</main>
+<script src="{% static 'biblioteca/visor.js' %}" defer></script>
+</body>
+</html>
