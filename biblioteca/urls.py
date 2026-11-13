@@ -23,6 +23,7 @@ urlpatterns = [
     path("organizar/", vistas.organizar, name="organizar"),
     path("organizar/guardar/", vistas.organizar_guardar, name="organizar_guardar"),
     path("estado/", vistas.estado, name="estado"),
+    path("salud/", vistas.salud, name="salud"),
     path("estado/escanear/", vistas.escanear_ahora, name="escanear"),
     path("acceder/", vistas.acceder, name="acceder"),
     path("salir/", vistas.salir, name="salir"),
