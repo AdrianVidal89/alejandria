@@ -781,6 +781,16 @@ def organizar_guardar(peticion):
 _escaneo = {"corriendo": False, "resumen": None}
 
 
+def salud(peticion):
+    """Para la comprobación de salud de Docker, que llama cada minuto: solo
+    mira que la base conteste. La página de estado entera sobra para eso."""
+    from django.db import connection
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1")
+    return HttpResponse("ok", content_type="text/plain")
+
+
 @acceso
 def estado(peticion):
     import shutil
